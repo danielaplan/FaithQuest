@@ -1,0 +1,11 @@
+{
+  "projectType": "webapp",
+  "assertions": [
+    {
+      "type": "command",
+      "name": "Build succeeds",
+      "command": "npm.cmd run build",
+      "expected": "success"
+    }
+  ]
+}
