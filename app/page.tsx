@@ -40,6 +40,7 @@ import {
   ArrowUp
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { loadPersistedState, savePersistedState } from "./lib/persistence";
 
 // ==========================================
 // 1. DATA TYPES & INTERFACES
@@ -642,58 +643,60 @@ export default function Home() {
 
   // On Mount: Load items and sync badge compatibility
   useEffect(() => {
-    const savedStudents = window.localStorage.getItem("faithquest-students");
-    const savedTheme = window.localStorage.getItem("faithquest-theme");
-    const savedSound = window.localStorage.getItem("faithquest-sound");
-    const savedQuizzes = window.localStorage.getItem("faithquest-quizzes");
+    let cancelled = false;
 
-    let loadedStudents = starterStudents;
-    if (savedStudents) {
-      try {
-        loadedStudents = JSON.parse(savedStudents) as Student[];
-      } catch (e) {
-        console.error("Failed parsing saved students", e);
+    async function hydrate() {
+      const persisted = await loadPersistedState();
+      if (cancelled) return;
+
+      if (!persisted) {
+        setStudents(starterStudents);
+        setQuizzes(starterQuizzes);
+        setTheme("emerald");
+        setSoundOn(true);
+        return;
       }
-    }
 
-    // Sync badges (backward compatibility)
-    const migrated = loadedStudents.map((student) => {
-      const existingBadges = student.badges || [];
-      let sCopy = { ...student, badges: existingBadges };
-      badgeDefinitions.forEach((badge) => {
-        if (!sCopy.badges?.includes(badge.id) && badge.check(sCopy)) {
-          sCopy.badges = [...(sCopy.badges || []), badge.id];
-        }
+      const loadedStudents = Array.isArray(persisted.students)
+        ? (persisted.students as Student[])
+        : starterStudents;
+      const loadedQuizzes = Array.isArray(persisted.quizzes)
+        ? (persisted.quizzes as SavedQuiz[])
+        : starterQuizzes;
+
+      const migrated = loadedStudents.map((student) => {
+        const existingBadges = student.badges || [];
+        let sCopy = { ...student, badges: existingBadges };
+        badgeDefinitions.forEach((badge) => {
+          if (!sCopy.badges?.includes(badge.id) && badge.check(sCopy)) {
+            sCopy.badges = [...(sCopy.badges || []), badge.id];
+          }
+        });
+        return sCopy;
       });
-      return sCopy;
-    });
 
-    setStudents(migrated);
+      setStudents(migrated);
+      setTheme(persisted.theme);
+      setSoundOn(persisted.sound);
+      setQuizzes(loadedQuizzes);
+    }
 
-    if (savedTheme) {
-      setTheme(savedTheme as any);
-    }
-    if (savedSound) {
-      setSoundOn(savedSound === "true");
-    }
-    if (savedQuizzes) {
-      try {
-        setQuizzes(JSON.parse(savedQuizzes) as SavedQuiz[]);
-      } catch (e) {
-        console.error("Failed parsing saved quizzes", e);
-      }
-    }
+    void hydrate();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  // Save Students Whenever State Changes
+  // Save app state whenever relevant data changes
   useEffect(() => {
-    window.localStorage.setItem("faithquest-students", JSON.stringify(students));
-  }, [students]);
-
-  // Save Quizzes Whenever State Changes
-  useEffect(() => {
-    window.localStorage.setItem("faithquest-quizzes", JSON.stringify(quizzes));
-  }, [quizzes]);
+    void savePersistedState({
+      students,
+      quizzes,
+      theme,
+      sound: soundOn
+    });
+  }, [students, quizzes, theme, soundOn]);
 
   // ==========================================
   // 6. SYNTHETIC SOUND CHIMES & FLASH ALERTS
