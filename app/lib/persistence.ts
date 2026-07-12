@@ -125,3 +125,36 @@ export async function savePersistedState(state: PersistedAppState) {
     console.warn("Supabase save failed; local storage remains available", error);
   }
 }
+
+export function subscribeToStateChanges(
+  onStateChange: (state: PersistedAppState) => void
+): (() => void) | null {
+  const client = getSupabaseClient();
+  if (!client) return null;
+
+  const channel = client
+    .channel("faithquest-state-changes")
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "faithquest_state",
+        filter: "id=eq.main"
+      },
+      (payload) => {
+        if (payload.new && typeof payload.new === "object" && "content" in payload.new) {
+          const content = (payload.new as { content: unknown }).content;
+          const normalized = normalizeState(content);
+          if (normalized) {
+            onStateChange(normalized);
+          }
+        }
+      }
+    )
+    .subscribe();
+
+  return () => {
+    void client.removeChannel(channel);
+  };
+}

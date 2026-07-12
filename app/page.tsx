@@ -40,7 +40,7 @@ import {
   ArrowUp
 } from "lucide-react";
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { loadPersistedState, savePersistedState } from "./lib/persistence";
+import { loadPersistedState, savePersistedState, subscribeToStateChanges } from "./lib/persistence";
 
 // ==========================================
 // 1. DATA TYPES & INTERFACES
@@ -636,6 +636,7 @@ export default function Home() {
   const [newStudentGroup, setNewStudentGroup] = useState("Sunday School");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastSavedStateRef = useRef<string>("");
 
   // ==========================================
   // 5. LIFECYCLE HOOKS (localStorage Integration)
@@ -654,6 +655,12 @@ export default function Home() {
         setQuizzes(starterQuizzes);
         setTheme("emerald");
         setSoundOn(true);
+        lastSavedStateRef.current = JSON.stringify({
+          students: starterStudents,
+          quizzes: starterQuizzes,
+          theme: "emerald",
+          sound: true
+        });
         return;
       }
 
@@ -675,10 +682,18 @@ export default function Home() {
         return sCopy;
       });
 
+      const stateToPersist = {
+        students: migrated,
+        quizzes: loadedQuizzes,
+        theme: persisted.theme,
+        sound: persisted.sound
+      };
+
       setStudents(migrated);
       setTheme(persisted.theme);
       setSoundOn(persisted.sound);
       setQuizzes(loadedQuizzes);
+      lastSavedStateRef.current = JSON.stringify(stateToPersist);
     }
 
     void hydrate();
@@ -688,14 +703,65 @@ export default function Home() {
     };
   }, []);
 
+  // Subscribe to real-time changes
+  useEffect(() => {
+    const unsubscribe = subscribeToStateChanges((newState) => {
+      const serialized = JSON.stringify(newState);
+      if (serialized === lastSavedStateRef.current) return;
+
+      lastSavedStateRef.current = serialized;
+
+      setStudents((curr) => {
+        const nextStr = JSON.stringify(newState.students);
+        if (JSON.stringify(curr) !== nextStr) {
+          const migrated = (newState.students as Student[]).map((student) => {
+            const existingBadges = student.badges || [];
+            let sCopy = { ...student, badges: existingBadges };
+            badgeDefinitions.forEach((badge) => {
+              if (!sCopy.badges?.includes(badge.id) && badge.check(sCopy)) {
+                sCopy.badges = [...(sCopy.badges || []), badge.id];
+              }
+            });
+            return sCopy;
+          });
+          return migrated;
+        }
+        return curr;
+      });
+
+      setQuizzes((curr) => {
+        if (JSON.stringify(curr) !== JSON.stringify(newState.quizzes)) {
+          return newState.quizzes as SavedQuiz[];
+        }
+        return curr;
+      });
+
+      setTheme((curr) => (curr !== newState.theme ? newState.theme : curr));
+      setSoundOn((curr) => (curr !== newState.sound ? newState.sound : curr));
+    });
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
   // Save app state whenever relevant data changes
   useEffect(() => {
-    void savePersistedState({
+    if (!lastSavedStateRef.current) {
+      return;
+    }
+    const stateToSave = {
       students,
       quizzes,
       theme,
       sound: soundOn
-    });
+    };
+    const serialized = JSON.stringify(stateToSave);
+    if (serialized === lastSavedStateRef.current) {
+      return;
+    }
+    lastSavedStateRef.current = serialized;
+    void savePersistedState(stateToSave);
   }, [students, quizzes, theme, soundOn]);
 
   // ==========================================
