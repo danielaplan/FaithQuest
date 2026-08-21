@@ -1,66 +1,62 @@
 # FaithQuest
 
-FaithQuest is a child ministry and Bible study tracking system built for Sunday school and youth programs. It helps leaders manage student participation, award faith points, record attendance, organize outreach events, and celebrate spiritual growth through badges, rewards, and quizzes.
+FaithQuest is a teacher-first ministry tracking app for Sunday school, youth groups, and outreach programs. It helps leaders manage students, award faith points, track attendance, unlock badges, run Bible quizzes, and celebrate growth in a fun, game-like classroom experience.
 
-The app is designed as a local-first dashboard with optional cloud persistence through Supabase, making it easy to use in sessions without a backend while still supporting remote sync when configured.
+The app is designed for live use on a projector or shared screen during class. It keeps the experience simple: one unified interface, no student login flow, and fast teacher controls for awarding points and tracking participation in real time.
 
 ## Overview
 
 FaithQuest gives ministry leaders a single place to:
 
-- Track students by group and enrollment date
-- Record Sunday school and outreach attendance
+- Manage student profiles and groups
+- Record Sunday School and Outreach attendance
 - Award points for participation, scripture memorization, helping others, and quiz success
-- Unlock achievement badges based on progress milestones
-- Assign fish and decor rewards to students
-- Create and run Bible quizzes
-- Save and restore state across sessions
+- Unlock progression badges and motivational milestones
+- Redeem fish and decor rewards from a reward catalog
+- Create and run Bible quizzes live in class
+- Maintain session continuity with browser storage or Supabase persistence
 
-## Key features
+## Core features
 
-### Student management
+### Student dashboard
 
-- Add and edit student profiles
-- Organize students by group or ministry class
-- View joined date and all activity history
-- Review progress through badges and rewards
+- Add and manage students by group or class
+- Review each student’s points, rewards, and badges
+- View recent activity and progress highlights
+- Explore student profiles in a visual ministry dashboard
 
-### Attendance and participation tracking
+### Attendance tracking
 
-- Log Sunday school attendance
-- Log outreach attendance
-- Track other ministry activities such as Bible verse memorization, discussion participation, event attendance, and helping classmates
+- Track Sunday School attendance separately from Outreach attendance
+- Use a shared date selector for same-day tracking
+- Mark each student present or absent with quick toggles
+- Automatically award points for attendance entries
 
-### Points and rewards
+### Live points and rewards
 
-- Award points for activity completion
-- Track each student's total earned points
-- Spend points on fish and decor rewards
-- Visualize reward collection over time
+- Award points instantly from a teacher-friendly control panel
+- Support quick preset actions such as +5, +10, +15, and +20
+- Enter custom activity labels for each award
+- Redeem reward items such as fish and decor using point totals
 
-### Badges and motivation
+### Badges and progression
 
-- Reward progress with themed milestones across categories like:
-  - attendance
-  - outreach
-  - scripture
-  - points
-  - quiz
-  - character
-- Automatically update badges as students hit thresholds
+- Trigger automatic badge checks after attendance, quiz results, and point awards
+- Include badge categories for attendance, outreach, scripture, points, quiz performance, and character
+- Display unlock conditions and progression in the student experience
 
 ### Quiz system
 
-- Create custom Bible-themed quizzes
-- Add multiple-choice questions with answer keys
-- Score student performance
-- Award points based on correct responses
+- Build Bible-themed quizzes with multiple-choice questions
+- Set custom points per correct answer
+- Run quizzes live and reveal correct answers during class
+- Award points based on student performance and question accuracy
 
 ### Persistence
 
-- Saves app state in browser local storage by default
-- Supports Supabase-backed persistence for optional cloud syncing
-- Restores the previous session automatically when available
+- Store application state in local browser storage by default
+- Support Supabase-backed persistence when environment variables are configured
+- Restore prior state automatically across sessions
 
 ## Tech stack
 
@@ -75,16 +71,24 @@ FaithQuest gives ministry leaders a single place to:
 ```text
 .
 ├── app/
+│   ├── components/
 │   ├── lib/
-│   │   └── persistence.ts        # Local and Supabase state persistence
-│   ├── globals.css               # Global styles
-│   ├── layout.tsx                # Root layout and metadata
-│   └── page.tsx                  # Main FaithQuest dashboard and logic
+│   │   └── persistence.ts
+│   ├── globals.css
+│   ├── layout.tsx
+│   ├── page.tsx
+│   └── FaithQuest-Redesign-Plan.md
+├── design-system/
+│   └── faithquest/
+├── context/
+├── lib/
+├── styles/
 ├── .gitignore
 ├── next.config.ts
 ├── package.json
 ├── tsconfig.json
 ├── README.md
+├── next-env.d.ts
 └── package-lock.json
 ```
 
@@ -96,13 +100,13 @@ FaithQuest gives ministry leaders a single place to:
    npm install
    ```
 
-2. Start the development server:
+2. Start the local development server:
 
    ```bash
    npm run dev
    ```
 
-3. Open the app in your browser at:
+3. Open the app in a browser:
 
    ```text
    http://localhost:3000
@@ -110,19 +114,17 @@ FaithQuest gives ministry leaders a single place to:
 
 ## Available scripts
 
-In the project root, you can run:
-
 ```bash
 npm run dev
 ```
 
-Starts the local Next.js development server.
+Starts the Next.js development server.
 
 ```bash
 npm run build
 ```
 
-Creates a production build.
+Creates a production build for deployment.
 
 ```bash
 npm run start
@@ -134,25 +136,25 @@ Runs the production build locally.
 npm run lint
 ```
 
-Runs ESLint checks using the project configuration.
+Runs ESLint checks against the project.
 
 ## Environment configuration
 
-This app can run in local-only mode without setup. If you want to enable Supabase-backed persistence, create a `.env.local` file in the project root and add:
+The app works in local-only mode without any setup. If you want to enable optional Supabase persistence, create a `.env.local` file in the project root and add:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-The app checks for these values and automatically uses Supabase when they are present.
+When those values are present, the app automatically uses Supabase-backed persistence instead of relying only on browser storage.
 
 ## Notes
 
-- The app is intended for ministry leaders and teachers managing children and youth participation.
+- This project is intended for ministry leaders and teachers managing kids and youth engagement.
 - Data is primarily stored client-side unless Supabase is configured.
-- It is optimized for quick, in-session tracking during classes, events, and outreach activities.
+- The interface is optimized for quick, classroom-friendly operation during lessons, events, and outreach programs.
 
 ## License
 
-This project does not currently include a custom license file. If you plan to distribute it publicly or in a team environment, add the appropriate open-source or internal-use licensing terms before deployment.
+This project does not currently include a license file. If you plan to distribute or deploy it publicly, add the appropriate licensing terms before release.
