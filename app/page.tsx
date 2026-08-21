@@ -37,9 +37,16 @@ import {
   Search,
   Activity,
   X,
-  ArrowUp
+  ArrowUp,
+  Monitor,
+  Heart,
+  Flame,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
+  Crown
 } from "lucide-react";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { loadPersistedState, savePersistedState, subscribeToStateChanges } from "./lib/persistence";
 
 // ==========================================
@@ -97,12 +104,6 @@ export type SavedQuiz = {
   createdAt: string;
 };
 
-export type AttendanceRecord = {
-  date: string;
-  sundaySchool: string[]; // List of student IDs present
-  outreach: string[];     // List of student IDs present
-};
-
 export type BadgeCategory =
   | "attendance"
   | "outreach"
@@ -122,18 +123,18 @@ export type Badge = {
 };
 
 // ==========================================
-// 2. STATIC CONFIGURATIONS & DICTIONARIES
+// 2. STATIC CATALOGS & BADGES
 // ==========================================
 
 export const rewardCatalog: Reward[] = [
-  { id: "small-fish", name: "Small Fish", cost: 50, type: "fish" },
-  { id: "color-fish", name: "Colorful Fish", cost: 100, type: "fish" },
-  { id: "rare-fish", name: "Rare Fish", cost: 300, type: "fish" },
-  { id: "golden-fish", name: "Golden Fish", cost: 500, type: "fish" },
-  { id: "water-plant", name: "Water Plant", cost: 70, type: "decor" },
+  { id: "small-fish", name: "Small Guppy", cost: 50, type: "fish" },
+  { id: "color-fish", name: "Neon Tetra", cost: 100, type: "fish" },
+  { id: "rare-fish", name: "Angelfish", cost: 300, type: "fish" },
+  { id: "golden-fish", name: "Golden Koi", cost: 500, type: "fish" },
+  { id: "water-plant", name: "Sea Grass", cost: 70, type: "decor" },
   { id: "castle", name: "Treasure Castle", cost: 180, type: "decor" },
-  { id: "coral", name: "Coral Reef", cost: 140, type: "decor" },
-  { id: "rocks", name: "Smooth Rocks", cost: 60, type: "decor" }
+  { id: "coral", name: "Rainbow Coral", cost: 140, type: "decor" },
+  { id: "rocks", name: "Smooth River Rocks", cost: 60, type: "decor" }
 ];
 
 export const activityOptions: Record<ActivityKind, { label: string; points: number }> = {
@@ -142,15 +143,14 @@ export const activityOptions: Record<ActivityKind, { label: string; points: numb
   verse: { label: "Bible Verse Memorized", points: 20 },
   quiz: { label: "Quiz Question Correct", points: 15 },
   discussion: { label: "Discussion Participation", points: 5 },
-  bible: { label: "Brought Bible", points: 2 },
+  bible: { label: "Brought Bible to Class", points: 2 },
   event: { label: "Church Event Joined", points: 20 },
   helping: { label: "Helped a Classmate", points: 10 },
   custom: { label: "Custom Teacher Award", points: 5 }
 };
 
-// Expanded Badge List (27 badges)
 export const badgeDefinitions: Badge[] = [
-  // SS Attendance Badges
+  // Attendance Badges
   {
     id: "first-steps",
     name: "First Steps",
@@ -158,7 +158,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 1 session",
     condition: "Attend 1 session",
     category: "attendance",
-    check: (s) => s.activities.filter(a => a.kind === "attendance" || a.kind === "outreach").length >= 1
+    check: (s) => s.activities.filter((a) => a.kind === "attendance" || a.kind === "outreach").length >= 1
   },
   {
     id: "faithful-beginner",
@@ -167,7 +167,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 5 sessions",
     condition: "Attend 5 sessions",
     category: "attendance",
-    check: (s) => s.activities.filter(a => a.kind === "attendance" || a.kind === "outreach").length >= 5
+    check: (s) => s.activities.filter((a) => a.kind === "attendance" || a.kind === "outreach").length >= 5
   },
   {
     id: "dedicated-learner",
@@ -176,7 +176,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 10 sessions",
     condition: "Attend 10 sessions",
     category: "attendance",
-    check: (s) => s.activities.filter(a => a.kind === "attendance" || a.kind === "outreach").length >= 10
+    check: (s) => s.activities.filter((a) => a.kind === "attendance" || a.kind === "outreach").length >= 10
   },
   {
     id: "consistent-member",
@@ -185,7 +185,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 20 sessions",
     condition: "Attend 20 sessions",
     category: "attendance",
-    check: (s) => s.activities.filter(a => a.kind === "attendance" || a.kind === "outreach").length >= 20
+    check: (s) => s.activities.filter((a) => a.kind === "attendance" || a.kind === "outreach").length >= 20
   },
   {
     id: "always-present",
@@ -194,7 +194,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 50 sessions",
     condition: "Attend 50 sessions",
     category: "attendance",
-    check: (s) => s.activities.filter(a => a.kind === "attendance" || a.kind === "outreach").length >= 50
+    check: (s) => s.activities.filter((a) => a.kind === "attendance" || a.kind === "outreach").length >= 50
   },
   {
     id: "sunday-champion",
@@ -203,9 +203,9 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 10 Sunday School sessions",
     condition: "Attend 10 Sunday School sessions",
     category: "attendance",
-    check: (s) => s.activities.filter(a => a.kind === "attendance" && a.label.includes("Sunday School")).length >= 10
+    check: (s) => s.activities.filter((a) => a.kind === "attendance" && a.label.includes("Sunday School")).length >= 10
   },
-  
+
   // Outreach Badges
   {
     id: "first-mission",
@@ -214,7 +214,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 1 Outreach",
     condition: "Attend 1 Outreach",
     category: "outreach",
-    check: (s) => s.activities.filter(a => a.kind === "outreach").length >= 1
+    check: (s) => s.activities.filter((a) => a.kind === "outreach").length >= 1
   },
   {
     id: "outreach-faithful",
@@ -223,7 +223,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 3 Outreach events",
     condition: "Attend 3 Outreach events",
     category: "outreach",
-    check: (s) => s.activities.filter(a => a.kind === "outreach").length >= 3
+    check: (s) => s.activities.filter((a) => a.kind === "outreach").length >= 3
   },
   {
     id: "outreach-hero",
@@ -232,7 +232,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 5 Outreach events",
     condition: "Attend 5 Outreach events",
     category: "outreach",
-    check: (s) => s.activities.filter(a => a.kind === "outreach").length >= 5
+    check: (s) => s.activities.filter((a) => a.kind === "outreach").length >= 5
   },
   {
     id: "mission-dedicated",
@@ -241,7 +241,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 10 Outreach events",
     condition: "Attend 10 Outreach events",
     category: "outreach",
-    check: (s) => s.activities.filter(a => a.kind === "outreach").length >= 10
+    check: (s) => s.activities.filter((a) => a.kind === "outreach").length >= 10
   },
   {
     id: "outreach-champion",
@@ -250,16 +250,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Attend 20 Outreach events",
     condition: "Attend 20 Outreach events",
     category: "outreach",
-    check: (s) => s.activities.filter(a => a.kind === "outreach").length >= 20
-  },
-  {
-    id: "mission-legend",
-    name: "Mission Legend",
-    icon: "👑",
-    description: "Attend 50 Outreach events",
-    condition: "Attend 50 Outreach events",
-    category: "outreach",
-    check: (s) => s.activities.filter(a => a.kind === "outreach").length >= 50
+    check: (s) => s.activities.filter((a) => a.kind === "outreach").length >= 20
   },
 
   // Scripture Badges
@@ -270,7 +261,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Memorize 1 Bible verse",
     condition: "Memorize 1 Bible verse",
     category: "scripture",
-    check: (s) => s.activities.filter(a => a.kind === "verse").length >= 1
+    check: (s) => s.activities.filter((a) => a.kind === "verse").length >= 1
   },
   {
     id: "scripture-learner",
@@ -279,7 +270,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Memorize 5 verses",
     condition: "Memorize 5 verses",
     category: "scripture",
-    check: (s) => s.activities.filter(a => a.kind === "verse").length >= 5
+    check: (s) => s.activities.filter((a) => a.kind === "verse").length >= 5
   },
   {
     id: "word-keeper",
@@ -288,7 +279,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Memorize 10 verses",
     condition: "Memorize 10 verses",
     category: "scripture",
-    check: (s) => s.activities.filter(a => a.kind === "verse").length >= 10
+    check: (s) => s.activities.filter((a) => a.kind === "verse").length >= 10
   },
   {
     id: "scripture-master",
@@ -297,7 +288,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Memorize 20 verses",
     condition: "Memorize 20 verses",
     category: "scripture",
-    check: (s) => s.activities.filter(a => a.kind === "verse").length >= 20
+    check: (s) => s.activities.filter((a) => a.kind === "verse").length >= 20
   },
   {
     id: "living-word",
@@ -306,7 +297,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Memorize 50 verses",
     condition: "Memorize 50 verses",
     category: "scripture",
-    check: (s) => s.activities.filter(a => a.kind === "verse").length >= 50
+    check: (s) => s.activities.filter((a) => a.kind === "verse").length >= 50
   },
 
   // Points Badges
@@ -373,7 +364,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Answer 1 quiz correctly",
     condition: "Answer 1 quiz correctly",
     category: "quiz",
-    check: (s) => s.activities.filter(a => a.kind === "quiz").length >= 1
+    check: (s) => s.activities.filter((a) => a.kind === "quiz").length >= 1
   },
   {
     id: "bible-scholar",
@@ -382,7 +373,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Answer 10 quizzes correctly",
     condition: "Answer 10 quizzes correctly",
     category: "quiz",
-    check: (s) => s.activities.filter(a => a.kind === "quiz").length >= 10
+    check: (s) => s.activities.filter((a) => a.kind === "quiz").length >= 10
   },
   {
     id: "trivia-master",
@@ -391,7 +382,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Answer 25 quizzes correctly",
     condition: "Answer 25 quizzes correctly",
     category: "quiz",
-    check: (s) => s.activities.filter(a => a.kind === "quiz").length >= 25
+    check: (s) => s.activities.filter((a) => a.kind === "quiz").length >= 25
   },
 
   // Character Badges
@@ -402,7 +393,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Help a classmate 1 time",
     condition: "Help a classmate 1 time",
     category: "character",
-    check: (s) => s.activities.filter(a => a.kind === "helping").length >= 1
+    check: (s) => s.activities.filter((a) => a.kind === "helping").length >= 1
   },
   {
     id: "servant-leader",
@@ -411,7 +402,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Help a classmate 5 times",
     condition: "Help a classmate 5 times",
     category: "character",
-    check: (s) => s.activities.filter(a => a.kind === "helping").length >= 5
+    check: (s) => s.activities.filter((a) => a.kind === "helping").length >= 5
   },
   {
     id: "community-pillar",
@@ -420,7 +411,7 @@ export const badgeDefinitions: Badge[] = [
     description: "Help a classmate 10 times",
     condition: "Help a classmate 10 times",
     category: "character",
-    check: (s) => s.activities.filter(a => a.kind === "helping").length >= 10
+    check: (s) => s.activities.filter((a) => a.kind === "helping").length >= 10
   }
 ];
 
@@ -439,7 +430,7 @@ const starterStudents: Student[] = [
       { id: "init-quiz", date: "2026-07-19", kind: "quiz", label: "Quiz Question Correct", points: 15 },
       { id: "init-help", date: "2026-07-19", kind: "helping", label: "Helped a Classmate", points: 10 }
     ],
-    badges: []
+    badges: ["first-steps", "faith-starter", "verse-explorer", "quiz-taker", "kind-heart"]
   },
   {
     id: "mika",
@@ -452,9 +443,9 @@ const starterStudents: Student[] = [
       { id: "init-ss-m2", date: "2026-07-12", kind: "attendance", label: "Sunday School Attendance", points: 10 },
       { id: "init-verse-m", date: "2026-07-12", kind: "verse", label: "Bible Verse Memorized", points: 20 },
       { id: "init-disc-m", date: "2026-07-12", kind: "discussion", label: "Discussion Participation", points: 5 },
-      { id: "init-bible-m", date: "2026-07-19", kind: "bible", label: "Brought Bible", points: 2 }
+      { id: "init-bible-m", date: "2026-07-19", kind: "bible", label: "Brought Bible to Class", points: 2 }
     ],
-    badges: []
+    badges: ["first-steps", "faith-starter", "verse-explorer"]
   },
   {
     id: "elijah",
@@ -468,31 +459,31 @@ const starterStudents: Student[] = [
       { id: "init-disc-e", date: "2026-07-12", kind: "discussion", label: "Discussion Participation", points: 5 },
       { id: "init-help-e", date: "2026-07-19", kind: "helping", label: "Helped a Classmate", points: 10 }
     ],
-    badges: []
+    badges: ["first-steps", "kind-heart"]
   }
 ];
 
 const starterQuizzes: SavedQuiz[] = [
   {
     id: "quiz-bible-basics",
-    title: "Bible Basics Quiz",
+    title: "Bible Basics Explorer",
     pointsPerCorrect: 15,
     createdAt: "2026-07-12T12:00:00Z",
     questions: [
-      { id: "q1", question: "How many books are in the Bible?", options: ["46", "66", "72", "39"], correctIndex: 1 },
+      { id: "q1", question: "How many books are in the Holy Bible?", options: ["46", "66", "72", "39"], correctIndex: 1 },
       { id: "q2", question: "What is the first book of the Bible?", options: ["Exodus", "Genesis", "Matthew", "John"], correctIndex: 1 },
       { id: "q3", question: "In what town was Jesus born?", options: ["Nazareth", "Jerusalem", "Bethlehem", "Rome"], correctIndex: 2 }
     ]
   },
   {
     id: "quiz-ot-heroes",
-    title: "Old Testament Heroes",
+    title: "Heroes of the Old Testament",
     pointsPerCorrect: 15,
     createdAt: "2026-07-12T12:05:00Z",
     questions: [
       { id: "q4", question: "Who built the Ark according to God's instructions?", options: ["Moses", "Noah", "Abraham", "David"], correctIndex: 1 },
       { id: "q5", question: "Who was swallowed by a great fish when running from God?", options: ["Jonah", "Daniel", "Paul", "Peter"], correctIndex: 0 },
-      { id: "q6", question: "What giant did the young boy David defeat with a sling and a stone?", options: ["Goliath", "Og", "Saul", "Samson"], correctIndex: 0 }
+      { id: "q6", question: "What giant did young David defeat with a sling and stone?", options: ["Goliath", "Og", "Saul", "Samson"], correctIndex: 0 }
     ]
   }
 ];
@@ -506,17 +497,21 @@ export function today() {
 }
 
 export function formatCalendarDate(dateString: string) {
-  const value = new Date(`${dateString}T00:00:00`);
-  return value.toLocaleDateString("en", {
-    month: "long",
-    day: "numeric",
-    year: "numeric"
-  });
+  try {
+    const value = new Date(`${dateString}T00:00:00`);
+    return value.toLocaleDateString("en", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+  } catch {
+    return dateString;
+  }
 }
 
 export function totalPoints(student: Student) {
-  const earned = student.activities.reduce((sum, activity) => sum + activity.points, 0);
-  const spent = student.rewards.reduce((sum, rewardId) => {
+  const earned = (student.activities || []).reduce((sum, activity) => sum + (activity.points || 0), 0);
+  const spent = (student.rewards || []).reduce((sum, rewardId) => {
     const reward = rewardCatalog.find((item) => item.id === rewardId);
     return sum + (reward?.cost ?? 0);
   }, 0);
@@ -526,62 +521,53 @@ export function totalPoints(student: Student) {
 
 export function treeLevel(points: number) {
   if (points >= 650) {
-    return { level: 5, name: "Tree of Wisdom", percent: 100 };
+    return { level: 5, name: "Tree of Wisdom", stage: "Mighty Oak", percent: 100, nextAt: 650, icon: "🌳" };
   }
   if (points >= 400) {
     const progress = points - 400;
-    return { level: 4, name: "Strong Tree", percent: Math.min(100, Math.round((progress / 250) * 100)) };
+    return { level: 4, name: "Blossom Tree", stage: "Fruitful Branch", percent: Math.min(100, Math.round((progress / 250) * 100)), nextAt: 650, icon: "🌲" };
   }
   if (points >= 220) {
     const progress = points - 220;
-    return { level: 3, name: "Growing Tree", percent: Math.min(100, Math.round((progress / 180) * 100)) };
+    return { level: 3, name: "Growing Tree", stage: "Young Tree", percent: Math.min(100, Math.round((progress / 180) * 100)), nextAt: 400, icon: "🌿" };
   }
   if (points >= 80) {
     const progress = points - 80;
-    return { level: 2, name: "Young Plant", percent: Math.min(100, Math.round((progress / 140) * 100)) };
+    return { level: 2, name: "Sapling", stage: "Green Sprout", percent: Math.min(100, Math.round((progress / 140) * 100)), nextAt: 220, icon: "🌱" };
   }
-  return { level: 1, name: "Seed", percent: Math.min(100, Math.round((points / 80) * 100)) };
+  return { level: 1, name: "Seed", stage: "Planted Seed", percent: Math.min(100, Math.round((points / 80) * 100)), nextAt: 80, icon: "🌰" };
 }
 
-// Auto badge award scanner
 export function checkAndAwardBadges(
   student: Student,
-  onAward: (badgeName: string) => void
+  onAward?: (badgeName: string) => void
 ): Student {
-  const currentBadges = student.badges || [];
-  const updatedBadges = [...currentBadges];
-  let awarded = false;
+  const currentBadges = new Set(student.badges || []);
+  let newlyAwarded = false;
 
-  badgeDefinitions.forEach((badge) => {
-    if (!updatedBadges.includes(badge.id)) {
-      if (badge.check(student)) {
-        updatedBadges.push(badge.id);
-        onAward(badge.name);
-        awarded = true;
+  badgeDefinitions.forEach((b) => {
+    if (!currentBadges.has(b.id) && b.check(student)) {
+      currentBadges.add(b.id);
+      newlyAwarded = true;
+      if (onAward) {
+        onAward(b.name);
       }
     }
   });
 
-  if (awarded) {
-    return { ...student, badges: updatedBadges };
+  if (newlyAwarded) {
+    return { ...student, badges: Array.from(currentBadges) };
   }
   return student;
 }
 
-const themeStyles = {
-  emerald: { "--teal": "#086d64", "--teal-dark": "#034842" } as React.CSSProperties,
-  gold: { "--teal": "#b45309", "--teal-dark": "#78350f" } as React.CSSProperties,
-  aqua: { "--teal": "#0284c7", "--teal-dark": "#0369a1" } as React.CSSProperties,
-};
-
 // ==========================================
-// 4. MAIN HOME COMPONENT
+// 4. MAIN FAITHQUEST APPLICATION COMPONENT
 // ==========================================
 
 export default function Home() {
   // --- Persistent States ---
   const [students, setStudents] = useState<Student[]>(starterStudents);
-  const [attendanceDate, setAttendanceDate] = useState(today());
   const [quizzes, setQuizzes] = useState<SavedQuiz[]>(starterQuizzes);
   const [theme, setTheme] = useState<"emerald" | "gold" | "aqua">("emerald");
   const [soundOn, setSoundOn] = useState(true);
@@ -590,48 +576,59 @@ export default function Home() {
   const [activeView, setActiveView] = useState<
     "dashboard" | "students" | "attendance" | "livePoints" | "quizBuilder" | "runQuiz" | "leaderboard" | "manage"
   >("dashboard");
+
+  // --- Filters, Search, Modals ---
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedGroup, setSelectedGroup] = useState<string>("All");
+  const [studentSortBy, setStudentSortBy] = useState<"points" | "name" | "badges">("points");
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-  const [flashMessage, setFlashMessage] = useState<string | null>(null);
+  const [activeProfileTab, setActiveProfileTab] = useState<"aquarium" | "tree" | "badges" | "history">("aquarium");
+  const [flashMessage, setFlashMessage] = useState<{ title: string; desc?: string } | null>(null);
 
-  // --- Modals / Popups States ---
+  // --- Projector & Time Mode ---
+  const [isProjectorMode, setIsProjectorMode] = useState(false);
+  const [currentDateTime, setCurrentDateTime] = useState("");
+
+  // --- Modals / Popups ---
   const [showQuickAttendance, setShowQuickAttendance] = useState(false);
   const [showQuickAward, setShowQuickAward] = useState(false);
   const [showAddStudentModal, setShowAddStudentModal] = useState(false);
   const [pendingDeleteStudentId, setPendingDeleteStudentId] = useState<string | null>(null);
-  const [deleteConfirmationName, setDeleteConfirmationName] = useState("");
-  const [deleteConfirmationInput, setDeleteConfirmationInput] = useState("");
 
-  // --- Quick Award States (Dashboard / Mini-modal) ---
+  // --- Quick Award States ---
   const [quickAwardStudentId, setQuickAwardStudentId] = useState("");
   const [quickAwardAmount, setQuickAwardAmount] = useState(10);
-  const [quickAwardLabel, setQuickAwardLabel] = useState("");
+  const [quickAwardLabel, setQuickAwardLabel] = useState("Quick Teacher Award");
 
-  // --- Live Points Tab Session State ---
-  const [sessionGains, setSessionGains] = useState<Record<string, number>>({});
-  const [sessionActivityLog, setSessionActivityLog] = useState<
+  // --- Live Points Session States ---
+  const [selectedPointStudents, setSelectedPointStudents] = useState<string[]>([]);
+  const [customPointAmount, setCustomPointAmount] = useState(5);
+  const [customPointReason, setCustomPointReason] = useState("Good Behavior / Helping");
+  const [liveSessionLog, setLiveSessionLog] = useState<
     Array<{ id: string; time: string; studentName: string; label: string; points: number }>
   >([]);
-  const [livePointsLabel, setLivePointsLabel] = useState("");
 
-  // --- Quiz Builder Tab States ---
+  // --- Attendance States ---
+  const [attendanceSessionType, setAttendanceSessionType] = useState<"sundaySchool" | "outreach">("sundaySchool");
+  const [attendanceDate, setAttendanceDate] = useState(today());
+  const [presentStudentIds, setPresentStudentIds] = useState<Set<string>>(new Set());
+
+  // --- Quiz Builder States ---
   const [builderTitle, setBuilderTitle] = useState("");
   const [builderPoints, setBuilderPoints] = useState(15);
   const [builderQuestions, setBuilderQuestions] = useState<QuizQuestion[]>([
-    { id: `q-${Date.now()}-0`, question: "", options: ["", ""], correctIndex: 0 }
+    { id: `q-${Date.now()}-0`, question: "", options: ["", "", "", ""], correctIndex: 0 }
   ]);
   const [editingQuizId, setEditingQuizId] = useState<string | null>(null);
 
-  // --- Run Quiz Tab Live States ---
+  // --- Run Quiz Projector States ---
   const [activeQuiz, setActiveQuiz] = useState<SavedQuiz | null>(null);
   const [quizQuestionIndex, setQuizQuestionIndex] = useState(0);
-  const [quizState, setQuizState] = useState<"idle" | "question" | "reveal" | "results">("idle");
-  const [correctStudentsMap, setCorrectStudentsMap] = useState<Record<string, string[]>>({}); // questionId -> list of studentIds
-  const [quizRankSnapshot, setQuizRankSnapshot] = useState<Record<string, number>>({}); // studentId -> rank index (1-based)
-  const [quizSessionPoints, setQuizSessionPoints] = useState<Record<string, number>>({}); // studentId -> points earned this quiz
+  const [quizStage, setQuizStage] = useState<"question" | "options" | "reveal" | "award">("question");
+  const [quizAwardedStudents, setQuizAwardedStudents] = useState<Set<string>>(new Set());
 
-  // --- Add Student Form State ---
+  // --- New Student Form State ---
   const [newStudentName, setNewStudentName] = useState("");
   const [newStudentGroup, setNewStudentGroup] = useState("Sunday School");
 
@@ -639,10 +636,40 @@ export default function Home() {
   const lastSavedStateRef = useRef<string>("");
 
   // ==========================================
-  // 5. LIFECYCLE HOOKS (localStorage Integration)
+  // 5. CLOCK, KEYBOARD ACCESSIBILITY & PERSISTENCE
   // ==========================================
 
-  // On Mount: Load items and sync badge compatibility
+  // Global Escape key modal dismisser
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsProfileModalOpen(false);
+        setShowQuickAttendance(false);
+        setShowQuickAward(false);
+        setShowAddStudentModal(false);
+        setPendingDeleteStudentId(null);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  // Live session clock
+  useEffect(() => {
+    const updateTime = () => {
+      const now = new Date();
+      setCurrentDateTime(
+        now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }) +
+          " • " +
+          now.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+      );
+    };
+    updateTime();
+    const interval = setInterval(updateTime, 1000 * 30);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Hydration from Supabase / localStorage
   useEffect(() => {
     let cancelled = false;
 
@@ -671,16 +698,7 @@ export default function Home() {
         ? (persisted.quizzes as SavedQuiz[])
         : starterQuizzes;
 
-      const migrated = loadedStudents.map((student) => {
-        const existingBadges = student.badges || [];
-        let sCopy = { ...student, badges: existingBadges };
-        badgeDefinitions.forEach((badge) => {
-          if (!sCopy.badges?.includes(badge.id) && badge.check(sCopy)) {
-            sCopy.badges = [...(sCopy.badges || []), badge.id];
-          }
-        });
-        return sCopy;
-      });
+      const migrated = loadedStudents.map((student) => checkAndAwardBadges(student));
 
       const stateToPersist = {
         students: migrated,
@@ -703,7 +721,7 @@ export default function Home() {
     };
   }, []);
 
-  // Subscribe to real-time changes
+  // Sync state changes from Supabase
   useEffect(() => {
     const unsubscribe = subscribeToStateChanges((newState) => {
       const serialized = JSON.stringify(newState);
@@ -714,17 +732,7 @@ export default function Home() {
       setStudents((curr) => {
         const nextStr = JSON.stringify(newState.students);
         if (JSON.stringify(curr) !== nextStr) {
-          const migrated = (newState.students as Student[]).map((student) => {
-            const existingBadges = student.badges || [];
-            let sCopy = { ...student, badges: existingBadges };
-            badgeDefinitions.forEach((badge) => {
-              if (!sCopy.badges?.includes(badge.id) && badge.check(sCopy)) {
-                sCopy.badges = [...(sCopy.badges || []), badge.id];
-              }
-            });
-            return sCopy;
-          });
-          return migrated;
+          return (newState.students as Student[]).map((s) => checkAndAwardBadges(s));
         }
         return curr;
       });
@@ -745,11 +753,9 @@ export default function Home() {
     };
   }, []);
 
-  // Save app state whenever relevant data changes
+  // Save whenever state changes
   useEffect(() => {
-    if (!lastSavedStateRef.current) {
-      return;
-    }
+    if (!lastSavedStateRef.current) return;
     const stateToSave = {
       students,
       quizzes,
@@ -757,2474 +763,2693 @@ export default function Home() {
       sound: soundOn
     };
     const serialized = JSON.stringify(stateToSave);
-    if (serialized === lastSavedStateRef.current) {
-      return;
-    }
+    if (serialized === lastSavedStateRef.current) return;
     lastSavedStateRef.current = serialized;
     void savePersistedState(stateToSave);
   }, [students, quizzes, theme, soundOn]);
 
+  // Apply theme to body dataset
+  useEffect(() => {
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
   // ==========================================
-  // 6. SYNTHETIC SOUND CHIMES & FLASH ALERTS
+  // 6. SYNTHETIC AUDIO & TOAST ALERTS
   // ==========================================
 
-  function playSynthSound(type: "sparkles" | "success" | "splash") {
+  function playSynthSound(type: "sparkles" | "success" | "splash" | "fanfare" | "pop") {
     if (typeof window === "undefined" || !soundOn) return;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
       const now = ctx.currentTime;
 
       if (type === "sparkles") {
-        // High sparkling bell arpeggio
-        [523.25, 659.25, 783.99, 1046.50].forEach((freq, index) => {
+        [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = "sine";
-          osc.frequency.setValueAtTime(freq, now + index * 0.08);
-          gain.gain.setValueAtTime(0.06, now + index * 0.08);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.08 + 0.25);
+          osc.frequency.setValueAtTime(freq, now + i * 0.07);
+          gain.gain.setValueAtTime(0.06, now + i * 0.07);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.07 + 0.22);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(now + index * 0.08);
-          osc.stop(now + index * 0.08 + 0.3);
+          osc.start(now + i * 0.07);
+          osc.stop(now + i * 0.07 + 0.25);
         });
-      } else if (type === "success") {
-        // Energetic achievement fanfare
-        [261.63, 329.63, 392.00, 523.25, 659.25, 523.25, 783.99].forEach((freq, index) => {
+      } else if (type === "success" || type === "fanfare") {
+        [261.63, 329.63, 392.0, 523.25, 659.25, 783.99].forEach((freq, i) => {
           const osc = ctx.createOscillator();
           const gain = ctx.createGain();
           osc.type = "triangle";
-          osc.frequency.setValueAtTime(freq, now + index * 0.06);
-          gain.gain.setValueAtTime(0.08, now + index * 0.06);
-          gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.06 + 0.35);
+          osc.frequency.setValueAtTime(freq, now + i * 0.06);
+          gain.gain.setValueAtTime(0.08, now + i * 0.06);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.06 + 0.3);
           osc.connect(gain);
           gain.connect(ctx.destination);
-          osc.start(now + index * 0.06);
-          osc.stop(now + index * 0.06 + 0.4);
+          osc.start(now + i * 0.06);
+          osc.stop(now + i * 0.06 + 0.35);
         });
       } else if (type === "splash") {
-        // Water bubbles pop sweep
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sine";
-        osc.frequency.setValueAtTime(140, now);
-        osc.frequency.exponentialRampToValueAtTime(750, now + 0.12);
+        osc.frequency.setValueAtTime(120, now);
+        osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
         gain.gain.setValueAtTime(0.1, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
         osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.15);
+        osc.stop(now + 0.18);
+      } else if (type === "pop") {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.setValueAtTime(400, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.08);
+        gain.gain.setValueAtTime(0.08, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.1);
       }
     } catch (e) {
-      console.warn("Web AudioContext play synth failed", e);
+      console.warn("AudioContext playback unavailable", e);
     }
   }
 
-  function triggerFlash(message: string) {
-    setFlashMessage(message);
+  function triggerToast(title: string, desc?: string) {
+    setFlashMessage({ title, desc });
     setTimeout(() => {
-      setFlashMessage((prev) => (prev === message ? null : prev));
+      setFlashMessage((prev) => (prev?.title === title ? null : prev));
     }, 4500);
   }
 
-  function changeTheme(newTheme: "emerald" | "gold" | "aqua") {
-    setTheme(newTheme);
-    window.localStorage.setItem("faithquest-theme", newTheme);
-    playSynthSound("sparkles");
-  }
-
-  function toggleSound() {
-    const nextSound = !soundOn;
-    setSoundOn(nextSound);
-    window.localStorage.setItem("faithquest-sound", String(nextSound));
-  }
-
-  // ==========================================
-  // 7. CORE CORE MUTATOR FUNCTIONS
-  // ==========================================
-
-  // Wrap updates to students to enforce badge rules & notifications
-  const modifyStudents = (updater: (prev: Student[]) => Student[]) => {
-    setStudents((prev) => {
-      const nextList = updater(prev);
-      return nextList.map((student) => {
-        return checkAndAwardBadges(student, (badgeName) => {
-          triggerFlash(`🏅 ${student.name} unlocked the badge: ${badgeName}!`);
-          playSynthSound("success");
-        });
-      });
-    });
-  };
-
-  // Add a new Student
-  function handleAddStudent(name: string, groupName: string) {
-    const trimmed = name.trim();
-    if (!trimmed) return;
-    const newId = `${trimmed.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now()}`;
-    const newS: Student = {
-      id: newId,
-      name: trimmed,
-      group: groupName || "Sunday School",
-      joinedAt: today(),
-      activities: [],
-      rewards: [],
-      badges: []
-    };
-
-    modifyStudents((curr) => [...curr, newS]);
-    triggerFlash(`🎉 Added student: ${trimmed}!`);
-    playSynthSound("success");
-  }
-
-  // Award custom points
-  function awardPoints(studentId: string, amount: number, labelText: string) {
-    const label = labelText.trim() || "Teacher Reward";
-    const dateStr = today();
-    const actId = `award-${studentId}-${Date.now()}`;
-
-    modifyStudents((prev) =>
+  // Award Points Helper
+  const awardPointsToStudent = (
+    studentId: string,
+    points: number,
+    label: string,
+    kind: ActivityKind = "custom"
+  ) => {
+    let targetName = "";
+    setStudents((prev) =>
       prev.map((student) => {
         if (student.id !== studentId) return student;
-        return {
-          ...student,
-          activities: [
-            ...student.activities,
-            { id: actId, date: dateStr, kind: "custom", label, points: amount }
-          ]
+        targetName = student.name;
+        const newAct: Activity = {
+          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: today(),
+          kind,
+          label,
+          points
         };
+        const updatedStudent = {
+          ...student,
+          activities: [newAct, ...(student.activities || [])]
+        };
+        return checkAndAwardBadges(updatedStudent, (bName) => {
+          triggerToast(`🎉 Badge Unlocked!`, `${student.name} earned "${bName}"!`);
+        });
       })
     );
 
-    // Track Session Gains
-    setSessionGains((prev) => ({
-      ...prev,
-      [studentId]: (prev[studentId] || 0) + amount
-    }));
-
-    // Find student name
-    const studentName = students.find((s) => s.id === studentId)?.name || "Student";
-    const timeStr = new Date().toLocaleTimeString("en", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-    setSessionActivityLog((prev) => [
-      { id: actId, time: timeStr, studentName, label, points: amount },
+    // Record in live session log
+    setLiveSessionLog((prev) => [
+      {
+        id: `log-${Date.now()}`,
+        time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        studentName: targetName || "Student",
+        label,
+        points
+      },
       ...prev
     ]);
 
-    playSynthSound("sparkles");
-  }
+    playSynthSound(points >= 20 ? "fanfare" : "sparkles");
+    triggerToast(`+${points} Points!`, `${targetName} received points for: ${label}`);
+  };
 
-  // Delete Student helper
-  function requestDeleteStudent(studentId: string) {
-    const s = students.find((item) => item.id === studentId);
-    if (!s) return;
-    setPendingDeleteStudentId(studentId);
-    setDeleteConfirmationName(s.name);
-    setDeleteConfirmationInput("");
-  }
+  // Bulk Award Points Helper
+  const awardPointsToMultiple = (
+    studentIds: string[],
+    points: number,
+    label: string,
+    kind: ActivityKind = "custom"
+  ) => {
+    if (studentIds.length === 0) return;
+    const dateStr = today();
 
-  function handleConfirmDelete() {
-    if (!pendingDeleteStudentId) return;
-    if (deleteConfirmationInput !== deleteConfirmationName) {
-      triggerFlash("Name did not match. Removal canceled.");
-      setPendingDeleteStudentId(null);
-      return;
-    }
-    setStudents((prev) => prev.filter((s) => s.id !== pendingDeleteStudentId));
-    triggerFlash(`Removed student ${deleteConfirmationName}.`);
-    setPendingDeleteStudentId(null);
-    playSynthSound("success");
-  }
-
-  // Unlock virtual reward
-  function unlockReward(studentId: string, rewardId: string) {
-    const s = students.find((item) => item.id === studentId);
-    const reward = rewardCatalog.find((r) => r.id === rewardId);
-    if (!s || !reward) return;
-
-    const points = totalPoints(s);
-    if (points.available < reward.cost) {
-      triggerFlash(`❌ Not enough points to unlock ${reward.name}!`);
-      return;
-    }
-
-    if (s.rewards.includes(rewardId)) {
-      triggerFlash(`❌ Already unlocked ${reward.name}!`);
-      return;
-    }
-
-    modifyStudents((prev) =>
+    setStudents((prev) =>
       prev.map((student) => {
-        if (student.id !== studentId) return student;
-        return {
-          ...student,
-          rewards: [...student.rewards, rewardId]
+        if (!studentIds.includes(student.id)) return student;
+        const newAct: Activity = {
+          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          date: dateStr,
+          kind,
+          label,
+          points
         };
+        const updated = {
+          ...student,
+          activities: [newAct, ...(student.activities || [])]
+        };
+        return checkAndAwardBadges(updated, (bName) => {
+          triggerToast(`🎉 Badge Unlocked!`, `${student.name} unlocked "${bName}"!`);
+        });
       })
     );
 
-    triggerFlash(`🐠 ${s.name} unlocked: ${reward.name}!`);
-    playSynthSound("splash");
-  }
+    studentIds.forEach((id) => {
+      const s = students.find((x) => x.id === id);
+      if (s) {
+        setLiveSessionLog((prev) => [
+          {
+            id: `log-${Date.now()}-${id}`,
+            time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+            studentName: s.name,
+            label,
+            points
+          },
+          ...prev
+        ]);
+      }
+    });
+
+    playSynthSound("fanfare");
+    triggerToast(`⚡ Points Awarded!`, `+${points} points given to ${studentIds.length} students.`);
+  };
 
   // ==========================================
-  // 8. TABS CALCULATED DATA
+  // 7. COMPUTED STATS & DATA
   // ==========================================
 
-  // Leaderboard ranking memo
+  const groupsList = useMemo(() => {
+    const set = new Set<string>();
+    students.forEach((s) => set.add(s.group || "Sunday School"));
+    return ["All", ...Array.from(set)];
+  }, [students]);
+
   const rankedStudents = useMemo(() => {
     return [...students].sort((a, b) => totalPoints(b).earned - totalPoints(a).earned);
   }, [students]);
 
-  // SS present and Outreach present list helper mapped by date picker
-  const ssPresentList = useMemo(() => {
-    return students
-      .filter((s) =>
-        s.activities.some(
-          (a) => a.date === attendanceDate && a.kind === "attendance" && a.id.startsWith("ss-attendance")
-        )
-      )
-      .map((s) => s.id);
-  }, [students, attendanceDate]);
+  const topStudent = rankedStudents[0] || null;
 
-  const outreachPresentList = useMemo(() => {
-    return students
-      .filter((s) =>
-        s.activities.some(
-          (a) => a.date === attendanceDate && a.kind === "outreach" && a.id.startsWith("outreach-attendance")
-        )
-      )
-      .map((s) => s.id);
-  }, [students, attendanceDate]);
-
-  // Attendance Toggles
-  function toggleSundaySchool(studentId: string, checked: boolean) {
-    const actId = `ss-attendance-${studentId}-${attendanceDate}`;
-    modifyStudents((prev) =>
-      prev.map((student) => {
-        if (student.id !== studentId) return student;
-        let acts = [...student.activities];
-        const exists = acts.some((a) => a.id === actId);
-
-        if (checked && !exists) {
-          acts.push({
-            id: actId,
-            date: attendanceDate,
-            kind: "attendance",
-            label: "Sunday School Attendance",
-            points: 10
-          });
-          playSynthSound("sparkles");
-        } else if (!checked && exists) {
-          acts = acts.filter((a) => a.id !== actId);
-          playSynthSound("splash");
-        }
-        return { ...student, activities: acts };
-      })
-    );
-  }
-
-  // Toggle Outreach Attendance
-  function toggleOutreach(studentId: string, checked: boolean) {
-    const actId = `outreach-attendance-${studentId}-${attendanceDate}`;
-    modifyStudents((prev) =>
-      prev.map((student) => {
-        if (student.id !== studentId) return student;
-        let acts = [...student.activities];
-        const exists = acts.some((a) => a.id === actId);
-
-        if (checked && !exists) {
-          acts.push({
-            id: actId,
-            date: attendanceDate,
-            kind: "outreach",
-            label: "Outreach Attendance",
-            points: 15
-          });
-          playSynthSound("sparkles");
-        } else if (!checked && exists) {
-          acts = acts.filter((a) => a.id !== actId);
-          playSynthSound("splash");
-        }
-        return { ...student, activities: acts };
-      })
-    );
-  }
-
-  function markAllSSPresent() {
-    modifyStudents((prev) =>
-      prev.map((student) => {
-        const actId = `ss-attendance-${student.id}-${attendanceDate}`;
-        const exists = student.activities.some((a) => a.id === actId);
-        if (!exists) {
-          return {
-            ...student,
-            activities: [
-              ...student.activities,
-              {
-                id: actId,
-                date: attendanceDate,
-                kind: "attendance",
-                label: "Sunday School Attendance",
-                points: 10
-              }
-            ]
-          };
-        }
-        return student;
-      })
-    );
-    playSynthSound("success");
-    triggerFlash("Marked all students present for Sunday School!");
-  }
-
-  // Mark all Outreach Present
-  function markAllOutreachPresent() {
-    modifyStudents((prev) =>
-      prev.map((student) => {
-        const actId = `outreach-attendance-${student.id}-${attendanceDate}`;
-        const exists = student.activities.some((a) => a.id === actId);
-        if (!exists) {
-          return {
-            ...student,
-            activities: [
-              ...student.activities,
-              {
-                id: actId,
-                date: attendanceDate,
-                kind: "outreach",
-                label: "Outreach Attendance",
-                points: 15
-              }
-            ]
-          };
-        }
-        return student;
-      })
-    );
-    playSynthSound("success");
-    triggerFlash("Marked all students present for Outreach!");
-  }
-
-  // ==========================================
-  // 9. DASHBOARD STATS & ALERTS ENGINE
-  // ==========================================
-
-  const totalPointsAwardedToday = useMemo(() => {
-    const todayStr = today();
-    return students.reduce((sum, s) => {
-      return (
-        sum +
-        s.activities.filter((a) => a.date === todayStr).reduce((sub, a) => sub + a.points, 0)
-      );
-    }, 0);
+  const totalPointsAwardedAll = useMemo(() => {
+    return students.reduce((sum, s) => sum + totalPoints(s).earned, 0);
   }, [students]);
 
   const presentTodayCount = useMemo(() => {
     const todayStr = today();
-    // Count student who had SS or Outreach attendance today
-    return students.filter((s) => {
-      return s.activities.some(
-        (a) =>
-          a.date === todayStr &&
-          (a.kind === "attendance" || a.kind === "outreach")
-      );
-    }).length;
+    return students.filter((s) =>
+      s.activities?.some((a) => a.date === todayStr && (a.kind === "attendance" || a.kind === "outreach"))
+    ).length;
   }, [students]);
 
-  // Dash Class Health Alerts calculation
-  const dashboardAlerts = useMemo(() => {
-    const alerts: string[] = [];
-    const todayMs = new Date().getTime();
-
-    students.forEach((s) => {
-      const earned = totalPoints(s).earned;
-
-      // 1. Milestone alerts
-      const nextMilestones = [50, 100, 200, 300, 500, 1000];
-      const milestoneNames: Record<number, string> = {
-        50: "Faith Starter",
-        100: "Growing in Faith",
-        200: "Shining Light",
-        300: "Role Model",
-        500: "Faith Champion",
-        1000: "Legendary"
-      };
-      const nextVal = nextMilestones.find((val) => val > earned);
-      if (nextVal) {
-        const gap = nextVal - earned;
-        if (gap > 0 && gap <= 15) {
-          alerts.push(`🔔 ${s.name} is only ${gap} pts away from a new badge (${milestoneNames[nextVal]})!`);
-        }
-      }
-
-      // 2. Scripture milestone near check
-      const verseCount = s.activities.filter((a) => a.kind === "verse").length;
-      const nextVerses = [1, 5, 10, 20, 50];
-      const verseBadgeNames: Record<number, string> = {
-        1: "Verse Explorer",
-        5: "Scripture Learner",
-        10: "Word Keeper",
-        20: "Scripture Master",
-        50: "Living Word"
-      };
-      const nextV = nextVerses.find((val) => val > verseCount);
-      if (nextV) {
-        const gapV = nextV - verseCount;
-        if (gapV === 1) {
-          alerts.push(`🔔 ${s.name} is 1 verse away from unlocking a new badge (${verseBadgeNames[nextV]})!`);
-        }
-      }
-
-      // 3. Highlight student's latest unlocked badge
-      if (s.badges && s.badges.length > 0) {
-        const lastBadgeId = s.badges[s.badges.length - 1];
-        const lastBadge = badgeDefinitions.find((b) => b.id === lastBadgeId);
-        if (lastBadge) {
-          alerts.push(`🎉 ${s.name} recently unlocked the badge: ${lastBadge.name} ${lastBadge.icon}`);
-        }
-      }
+  const filteredStudents = useMemo(() => {
+    let list = students.filter((s) => {
+      const matchesSearch = s.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesGroup = selectedGroup === "All" || s.group === selectedGroup;
+      return matchesSearch && matchesGroup;
     });
 
-    // 4. Inactivity check (2+ weeks)
-    let inactiveCount = 0;
-    students.forEach((s) => {
-      const attendanceActs = s.activities.filter(
-        (a) => a.kind === "attendance" || a.kind === "outreach"
-      );
-      if (attendanceActs.length > 0) {
-        // sort by date desc
-        const dates = attendanceActs.map((a) => new Date(a.date).getTime());
-        const latestDate = Math.max(...dates);
-        const daysAgo = (todayMs - latestDate) / (1000 * 60 * 60 * 24);
-        if (daysAgo >= 14) {
-          inactiveCount++;
-        }
-      } else {
-        const joinedDate = new Date(s.joinedAt).getTime();
-        const daysAgo = (todayMs - joinedDate) / (1000 * 60 * 60 * 24);
-        if (daysAgo >= 14) {
-          inactiveCount++;
-        }
-      }
-    });
-    if (inactiveCount > 0) {
-      alerts.push(`🔔 ${inactiveCount} student${inactiveCount > 1 ? "s" : ""} have not attended in 2+ weeks`);
+    if (studentSortBy === "points") {
+      list = list.sort((a, b) => totalPoints(b).earned - totalPoints(a).earned);
+    } else if (studentSortBy === "name") {
+      list = list.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (studentSortBy === "badges") {
+      list = list.sort((a, b) => (b.badges?.length || 0) - (a.badges?.length || 0));
     }
 
-    // 5. Hits 100 points this week count
-    let hit100Count = 0;
+    return list;
+  }, [students, searchQuery, selectedGroup, studentSortBy]);
+
+  const selectedStudent = useMemo(() => {
+    return students.find((s) => s.id === selectedStudentId) || null;
+  }, [students, selectedStudentId]);
+
+  // Recent 15 Activity Events
+  const recentActivities = useMemo(() => {
+    const all: Array<{ studentName: string; studentId: string; activity: Activity }> = [];
     students.forEach((s) => {
-      const earned = totalPoints(s).earned;
-      if (earned >= 100) {
-        // check if they gained points in the last 7 days
-        const recentPoints = s.activities.some((a) => {
-          const daysAgo = (todayMs - new Date(a.date).getTime()) / (1000 * 60 * 60 * 24);
-          return daysAgo <= 7;
-        });
-        if (recentPoints) {
-          hit100Count++;
-        }
-      }
-    });
-    if (hit100Count > 0) {
-      alerts.push(`🎉 ${hit100Count} student${hit100Count > 1 ? "s" : ""} hit 100+ total points this week!`);
-    }
-
-    // If no alerts, insert placeholders
-    if (alerts.length === 0) {
-      alerts.push("✨ Roster is fully healthy and up to date!");
-    }
-
-    return alerts.slice(0, 8);
-  }, [students]);
-
-  // Recent activity log feed
-  const recentActivitiesFeed = useMemo(() => {
-    const feed: Array<{ id: string; studentName: string; label: string; points: number; date: string; kind: ActivityKind }> = [];
-    students.forEach((s) => {
-      s.activities.forEach((a) => {
-        feed.push({
-          id: a.id,
-          studentName: s.name,
-          label: a.label,
-          points: a.points,
-          date: a.date,
-          kind: a.kind
-        });
+      (s.activities || []).forEach((act) => {
+        all.push({ studentName: s.name, studentId: s.id, activity: act });
       });
     });
-    return feed.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 15);
+    return all.sort((a, b) => b.activity.date.localeCompare(a.activity.date)).slice(0, 15);
   }, [students]);
 
-  // Distribution chart level stats
+  // Tree Level Distribution
   const treeDistribution = useMemo(() => {
-    const levels = { level1: 0, level2: 0, level3: 0, level4: 0, level5: 0 };
+    const counts = { Seed: 0, Sapling: 0, "Growing Tree": 0, "Blossom Tree": 0, "Tree of Wisdom": 0 };
     students.forEach((s) => {
-      const earned = totalPoints(s).earned;
-      const lvl = treeLevel(earned).level;
-      if (lvl === 5) levels.level5++;
-      else if (lvl === 4) levels.level4++;
-      else if (lvl === 3) levels.level3++;
-      else if (lvl === 2) levels.level2++;
-      else levels.level1++;
+      const lvl = treeLevel(totalPoints(s).earned);
+      if (lvl.level === 1) counts.Seed++;
+      else if (lvl.level === 2) counts.Sapling++;
+      else if (lvl.level === 3) counts["Growing Tree"]++;
+      else if (lvl.level === 4) counts["Blossom Tree"]++;
+      else if (lvl.level === 5) counts["Tree of Wisdom"]++;
     });
-    return levels;
+    return counts;
   }, [students]);
 
   // ==========================================
-  // 10. QUIZ CONTROLLERS (Run & Builder)
+  // 8. ACTIONS & HANDLERS
   // ==========================================
 
-  // Builder functions
-  function handleAddQuestion() {
-    setBuilderQuestions((prev) => [
-      ...prev,
-      { id: `q-${Date.now()}-${prev.length}`, question: "", options: ["", ""], correctIndex: 0 }
-    ]);
-  }
-
-  function handleRemoveQuestion(idx: number) {
-    if (builderQuestions.length <= 1) return;
-    setBuilderQuestions((prev) => prev.filter((_, i) => i !== idx));
-  }
-
-  function handleQuestionChange(idx: number, text: string) {
-    setBuilderQuestions((prev) =>
-      prev.map((q, i) => (i === idx ? { ...q, question: text } : q))
-    );
-  }
-
-  function handleOptionChange(qIdx: number, oIdx: number, val: string) {
-    setBuilderQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        const opts = [...q.options];
-        opts[oIdx] = val;
-        return { ...q, options: opts };
-      })
-    );
-  }
-
-  function handleAddOption(qIdx: number) {
-    setBuilderQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        if (q.options.length >= 6) return q;
-        return { ...q, options: [...q.options, ""] };
-      })
-    );
-  }
-
-  function handleRemoveOption(qIdx: number, oIdx: number) {
-    setBuilderQuestions((prev) =>
-      prev.map((q, i) => {
-        if (i !== qIdx) return q;
-        if (q.options.length <= 2) return q;
-        const opts = q.options.filter((_, o) => o !== oIdx);
-        let corr = q.correctIndex;
-        if (corr >= opts.length) corr = opts.length - 1;
-        return { ...q, options: opts, correctIndex: corr };
-      })
-    );
-  }
-
-  function handleSetCorrectOption(qIdx: number, oIdx: number) {
-    setBuilderQuestions((prev) =>
-      prev.map((q, i) => (i === qIdx ? { ...q, correctIndex: oIdx } : q))
-    );
-  }
-
-  function handleSaveQuiz(e: FormEvent) {
+  const handleAddStudent = (e: FormEvent) => {
     e.preventDefault();
-    if (!builderTitle.trim()) {
-      triggerFlash("❌ Quiz must have a Title!");
-      return;
-    }
-    // Validation
-    const invalid = builderQuestions.some((q) => !q.question.trim() || q.options.some((o) => !o.trim()));
-    if (invalid) {
-      triggerFlash("❌ All questions and options must be filled!");
-      return;
-    }
-
-    const quizData: SavedQuiz = {
-      id: editingQuizId || `quiz-${Date.now()}`,
-      title: builderTitle.trim(),
-      pointsPerCorrect: Number(builderPoints) || 15,
-      createdAt: new Date().toISOString(),
-      questions: builderQuestions.map((q, idx) => ({
-        ...q,
-        id: q.id || `q-${Date.now()}-${idx}`
-      }))
+    if (!newStudentName.trim()) return;
+    const newStudent: Student = {
+      id: `std-${Date.now()}`,
+      name: newStudentName.trim(),
+      group: newStudentGroup,
+      joinedAt: today(),
+      activities: [],
+      rewards: ["small-fish"],
+      badges: []
     };
+    setStudents((prev) => [newStudent, ...prev]);
+    setNewStudentName("");
+    setShowAddStudentModal(false);
+    playSynthSound("success");
+    triggerToast("Student Enrolled", `${newStudent.name} joined ${newStudent.group}!`);
+  };
+
+  const handleDeleteStudent = (studentId: string) => {
+    const student = students.find((s) => s.id === studentId);
+    if (!student) return;
+    setStudents((prev) => prev.filter((s) => s.id !== studentId));
+    setPendingDeleteStudentId(null);
+    if (selectedStudentId === studentId) {
+      setIsProfileModalOpen(false);
+      setSelectedStudentId(null);
+    }
+    playSynthSound("pop");
+    triggerToast("Student Removed", `${student.name} was removed from the roster.`);
+  };
+
+  const handleSaveQuiz = (e: FormEvent) => {
+    e.preventDefault();
+    if (!builderTitle.trim()) return;
 
     if (editingQuizId) {
-      setQuizzes((prev) => prev.map((q) => (q.id === editingQuizId ? quizData : q)));
-      triggerFlash("🎉 Quiz updated successfully!");
+      setQuizzes((prev) =>
+        prev.map((q) =>
+          q.id === editingQuizId
+            ? { ...q, title: builderTitle.trim(), pointsPerCorrect: builderPoints, questions: builderQuestions }
+            : q
+        )
+      );
+      setEditingQuizId(null);
+      triggerToast("Quiz Updated", `Saved changes to "${builderTitle.trim()}"`);
     } else {
-      setQuizzes((prev) => [...prev, quizData]);
-      triggerFlash("🎉 Quiz created successfully!");
+      const newQ: SavedQuiz = {
+        id: `quiz-${Date.now()}`,
+        title: builderTitle.trim(),
+        pointsPerCorrect: builderPoints,
+        questions: builderQuestions,
+        createdAt: new Date().toISOString()
+      };
+      setQuizzes((prev) => [newQ, ...prev]);
+      triggerToast("Quiz Created", `Added "${newQ.title}" with ${newQ.questions.length} questions!`);
     }
 
-    // Reset Builder Form
     setBuilderTitle("");
-    setBuilderPoints(15);
-    setBuilderQuestions([{ id: `q-${Date.now()}-0`, question: "", options: ["", ""], correctIndex: 0 }]);
-    setEditingQuizId(null);
-    setActiveView("quizBuilder");
+    setBuilderQuestions([{ id: `q-${Date.now()}-0`, question: "", options: ["", "", "", ""], correctIndex: 0 }]);
     playSynthSound("success");
-  }
+  };
 
-  function handleEditQuiz(quiz: SavedQuiz) {
-    setEditingQuizId(quiz.id);
-    setBuilderTitle(quiz.title);
-    setBuilderPoints(quiz.pointsPerCorrect);
-    setBuilderQuestions(quiz.questions);
-    setActiveView("quizBuilder");
-    playSynthSound("sparkles");
-  }
-
-  function handleDeleteQuiz(quizId: string) {
-    if (window.confirm("Are you sure you want to delete this quiz?")) {
-      setQuizzes((prev) => prev.filter((q) => q.id !== quizId));
-      triggerFlash("Quiz deleted.");
-      playSynthSound("splash");
-    }
-  }
-
-  // Live Run Quiz Functions
-  function launchQuizSession(quiz: SavedQuiz) {
-    setActiveQuiz(quiz);
-    setQuizQuestionIndex(0);
-    setQuizState("question");
-    setCorrectStudentsMap({});
-    setQuizSessionPoints({});
-
-    // Capture Rank Snapshot before points are added
-    const ranksSnapshot: Record<string, number> = {};
-    const sorted = [...students].sort((a, b) => totalPoints(b).earned - totalPoints(a).earned);
-    sorted.forEach((student, index) => {
-      ranksSnapshot[student.id] = index + 1;
-    });
-    setQuizRankSnapshot(ranksSnapshot);
-
-    setActiveView("runQuiz");
-    playSynthSound("success");
-    triggerFlash(`🎯 Launched live quiz: ${quiz.title}`);
-  }
-
-  function handleToggleCorrectStudent(studentId: string) {
-    if (!activeQuiz) return;
-    const q = activeQuiz.questions[quizQuestionIndex];
-    const prevList = correctStudentsMap[q.id] || [];
-    const isCorrect = prevList.includes(studentId);
-
-    const actId = `quiz-correct-${activeQuiz.id}-${q.id}-${studentId}`;
-
-    if (!isCorrect) {
-      // Award points
-      modifyStudents((prev) =>
-        prev.map((student) => {
-          if (student.id !== studentId) return student;
-          const exists = student.activities.some((a) => a.id === actId);
-          if (!exists) {
-            return {
-              ...student,
-              activities: [
-                ...student.activities,
-                {
-                  id: actId,
-                  date: today(),
-                  kind: "quiz",
-                  label: `Quiz Correct: ${activeQuiz.title} (Q${quizQuestionIndex + 1})`,
-                  points: activeQuiz.pointsPerCorrect
-                }
-              ]
-            };
-          }
-          return student;
-        })
-      );
-      setCorrectStudentsMap((prev) => ({
-        ...prev,
-        [q.id]: [...prevList, studentId]
-      }));
-      setQuizSessionPoints((prev) => ({
-        ...prev,
-        [studentId]: (prev[studentId] || 0) + activeQuiz.pointsPerCorrect
-      }));
-      playSynthSound("sparkles");
-    } else {
-      // Remove points
-      modifyStudents((prev) =>
-        prev.map((student) => {
-          if (student.id !== studentId) return student;
-          return {
-            ...student,
-            activities: student.activities.filter((a) => a.id !== actId)
-          };
-        })
-      );
-      setCorrectStudentsMap((prev) => ({
-        ...prev,
-        [q.id]: prevList.filter((id) => id !== studentId)
-      }));
-      setQuizSessionPoints((prev) => ({
-        ...prev,
-        [studentId]: Math.max(0, (prev[studentId] || 0) - activeQuiz.pointsPerCorrect)
-      }));
-      playSynthSound("splash");
-    }
-  }
-
-  function handleNextQuestion() {
-    if (!activeQuiz) return;
-    if (quizQuestionIndex < activeQuiz.questions.length - 1) {
-      setQuizQuestionIndex((idx) => idx + 1);
-      setQuizState("question");
-      playSynthSound("sparkles");
-    } else {
-      setQuizState("results");
-      playSynthSound("success");
-    }
-  }
-
-  function handleFinishQuiz() {
-    setActiveQuiz(null);
-    setQuizQuestionIndex(0);
-    setQuizState("idle");
-    setCorrectStudentsMap({});
-    setQuizSessionPoints({});
-    setQuizRankSnapshot({});
-    setActiveView("quizBuilder");
-    playSynthSound("success");
-  }
-
-  // ==========================================
-  // 11. DATA BACKUP / RESTORE / EXPORT
-  // ==========================================
-
-  function downloadBackup() {
-    const backupObj = {
-      students,
-      quizzes,
-      theme,
-      soundOn
-    };
-    const blob = new Blob([JSON.stringify(backupObj, null, 2)], { type: "application/json" });
+  const handleExportCSV = () => {
+    const headers = "Student ID,Name,Group,Total Points,Badges Count,Joined Date\n";
+    const rows = students
+      .map((s) => `"${s.id}","${s.name}","${s.group}",${totalPoints(s).earned},${s.badges?.length || 0},"${s.joinedAt}"`)
+      .join("\n");
+    const blob = new Blob([headers + rows], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `faithquest-backup-${today()}.json`;
+    link.download = `FaithQuest-Roster-${today()}.csv`;
     link.click();
     URL.revokeObjectURL(url);
-    triggerFlash("📥 Backup file downloaded successfully!");
-  }
+    playSynthSound("sparkles");
+    triggerToast("Export Complete", "CSV roster downloaded successfully.");
+  };
 
-  function handleRestoreUpload(e: ChangeEvent<HTMLInputElement>) {
+  const handleExportJSON = () => {
+    const data = JSON.stringify({ students, quizzes, theme, sound: soundOn }, null, 2);
+    const blob = new Blob([data], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `FaithQuest-Backup-${today()}.json`;
+    link.click();
+    URL.revokeObjectURL(url);
+    playSynthSound("sparkles");
+    triggerToast("Backup Downloaded", "Full state saved to JSON file.");
+  };
+
+  const handleImportJSON = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     const reader = new FileReader();
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed.students && Array.isArray(parsed.students)) {
-          setStudents(parsed.students);
-          if (parsed.quizzes) setQuizzes(parsed.quizzes);
-          if (parsed.theme) setTheme(parsed.theme);
-          if (typeof parsed.soundOn === "boolean") setSoundOn(parsed.soundOn);
-          triggerFlash("🎉 Roster & settings restored successfully!");
-          playSynthSound("success");
-        } else {
-          triggerFlash("❌ Invalid backup file format!");
+        if (Array.isArray(parsed.students)) {
+          setStudents(parsed.students.map((s: Student) => checkAndAwardBadges(s)));
         }
+        if (Array.isArray(parsed.quizzes)) {
+          setQuizzes(parsed.quizzes);
+        }
+        if (parsed.theme) setTheme(parsed.theme);
+        playSynthSound("success");
+        triggerToast("Restore Successful", "Student records and quizzes loaded.");
       } catch (err) {
-        triggerFlash("❌ Error reading backup file!");
+        console.error("JSON restore parse error", err);
+        triggerToast("Import Failed", "Invalid backup JSON file.");
       }
     };
     reader.readAsText(file);
-  }
-
-  function handleExportCSV() {
-    let csv = "Student Name,Group,Joined Date,Total Points Earned,Available Points,Badge Count,Badges Unlocked\n";
-    rankedStudents.forEach((s) => {
-      const pts = totalPoints(s);
-      const badgesStr = (s.badges || []).map((bid) => {
-        return badgeDefinitions.find((b) => b.id === bid)?.name || bid;
-      }).join("; ");
-
-      csv += `"${s.name}","${s.group}","${s.joinedAt}",${pts.earned},${pts.available},${(s.badges || []).length},"${badgesStr}"\n`;
-    });
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `faithquest-roster-${today()}.csv`;
-    link.click();
-    URL.revokeObjectURL(url);
-    triggerFlash("📥 CSV file exported successfully!");
-  }
-
-  // ==========================================
-  // 12. RENDER SUB-VIEWS
-  // ==========================================
-
-  // --- Profile Details Modal (Aquarium & FaithTree) ---
-  const activeStudentProfile = useMemo(() => {
-    return students.find((s) => s.id === selectedStudentId) || null;
-  }, [students, selectedStudentId]);
+  };
 
   return (
-    <main className="app-shell" style={themeStyles[theme]}>
-      {/* Top Settings and Config Bar */}
-      <header className="settings-bar">
-        <div className="bar-brand">
-          <Sparkles size={18} className="brand-logo-sparkle" />
-          <span className="brand-title">FaithQuest</span>
-          <span className="brand-mode-badge">Teacher Board</span>
-        </div>
-        <div className="bar-controls">
-          <button className="settings-btn" onClick={toggleSound} title="Toggle synthetic sounds">
-            {soundOn ? <Volume2 size={14} /> : <VolumeX size={14} />}
-            <span>{soundOn ? "Sound On" : "Muted"}</span>
-          </button>
-          
-          <div className="theme-palette">
-            <button
-              className={`settings-btn palette-btn emerald ${theme === "emerald" ? "active" : ""}`}
-              onClick={() => changeTheme("emerald")}
-              title="Emerald theme"
-            >
-              <Palette size={14} />
-              <span>Emerald</span>
-            </button>
-            <button
-              className={`settings-btn palette-btn gold ${theme === "gold" ? "active" : ""}`}
-              onClick={() => changeTheme("gold")}
-              title="Gold theme"
-            >
-              <Palette size={14} />
-              <span>Gold</span>
-            </button>
-            <button
-              className={`settings-btn palette-btn aqua ${theme === "aqua" ? "active" : ""}`}
-              onClick={() => changeTheme("aqua")}
-              title="Aqua theme"
-            >
-              <Palette size={14} />
-              <span>Aqua</span>
-            </button>
+    <div className={`app-container ${isProjectorMode ? "projector-mode" : ""}`}>
+      {/* ==========================================
+          HEADER HERO BANNER
+          ========================================== */}
+      <header className="hero-banner">
+        <div className="hero-top-row">
+          <div className="brand-badge">
+            <Sparkles size={20} color="var(--accent-light)" />
+            <span>FAITHQUEST</span>
+            <span style={{ opacity: 0.7, fontSize: "0.85rem", fontWeight: 600 }}>• Classroom Command</span>
           </div>
 
-          <button className="settings-btn backup-restore-btn" onClick={downloadBackup} title="Export backup file">
-            <Download size={14} />
-            <span>Backup JSON</span>
-          </button>
-          <button className="settings-btn backup-restore-btn" onClick={() => fileInputRef.current?.click()} title="Import backup file">
-            <Upload size={14} />
-            <span>Restore JSON</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="application/json"
-            hidden
-            onChange={handleRestoreUpload}
-          />
+          <div className="hero-controls">
+            {/* Live Clock */}
+            <div className="control-btn" style={{ cursor: "default" }}>
+              <Clock size={16} />
+              <span>{currentDateTime || "Live Session"}</span>
+            </div>
+
+            {/* Theme Switcher */}
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button
+                className={`control-btn ${theme === "emerald" ? "active" : ""}`}
+                onClick={() => {
+                  setTheme("emerald");
+                  playSynthSound("sparkles");
+                }}
+                title="Emerald Theme"
+              >
+                🌿 Emerald
+              </button>
+              <button
+                className={`control-btn ${theme === "gold" ? "active" : ""}`}
+                onClick={() => {
+                  setTheme("gold");
+                  playSynthSound("sparkles");
+                }}
+                title="Royal Gold Theme"
+              >
+                👑 Gold
+              </button>
+              <button
+                className={`control-btn ${theme === "aqua" ? "active" : ""}`}
+                onClick={() => {
+                  setTheme("aqua");
+                  playSynthSound("sparkles");
+                }}
+                title="Ocean Aqua Theme"
+              >
+                🌊 Aqua
+              </button>
+            </div>
+
+            {/* Sound Synthesizer Toggle */}
+            <button
+              className={`control-btn ${soundOn ? "active" : ""}`}
+              onClick={() => {
+                setSoundOn(!soundOn);
+                if (!soundOn) playSynthSound("sparkles");
+              }}
+              title={soundOn ? "Sound Effects ON" : "Sound Effects OFF"}
+            >
+              {soundOn ? <Volume2 size={16} /> : <VolumeX size={16} />}
+              <span>{soundOn ? "Audio ON" : "Muted"}</span>
+            </button>
+
+            {/* Projector Mode Toggle */}
+            <button
+              className={`control-btn ${isProjectorMode ? "active" : ""}`}
+              onClick={() => {
+                setIsProjectorMode(!isProjectorMode);
+                playSynthSound("pop");
+              }}
+              title="Toggle Large Screen Projector Mode"
+            >
+              <Monitor size={16} />
+              <span>Projector</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="hero-main-content">
+          <div className="hero-title-group">
+            <h1>Sunday School & Outreach Dashboard</h1>
+            <p>
+              Gamified live reward board for interactive church learning, attendance tracking, live quizzes, and spiritual growth.
+            </p>
+          </div>
+
+          <div className="hero-stats-deck">
+            <div className="stat-pill">
+              <div className="stat-pill-icon">
+                <Users size={22} />
+              </div>
+              <div className="stat-pill-info">
+                <span>Enrolled</span>
+                <strong>{students.length}</strong>
+              </div>
+            </div>
+
+            <div className="stat-pill">
+              <div className="stat-pill-icon" style={{ background: "var(--accent-glow)" }}>
+                <Trophy size={22} color="var(--accent-light)" />
+              </div>
+              <div className="stat-pill-info">
+                <span>Total Points</span>
+                <strong>{totalPointsAwardedAll}</strong>
+              </div>
+            </div>
+
+            <div className="stat-pill">
+              <div className="stat-pill-icon" style={{ background: "rgba(16, 185, 129, 0.3)" }}>
+                <CheckSquare size={22} color="var(--success)" />
+              </div>
+              <div className="stat-pill-info">
+                <span>Present Today</span>
+                <strong>{presentTodayCount}</strong>
+              </div>
+            </div>
+          </div>
         </div>
       </header>
 
-      {/* Global Toast Message Notification */}
-      {flashMessage && (
-        <div className="global-toast-message">
-          <div className="toast-content">
-            <Sparkles size={16} className="toast-icon-sparkle" />
-            <span>{flashMessage}</span>
-          </div>
-        </div>
-      )}
+      {/* ==========================================
+          TAB NAVIGATION (8 TACTILE BUTTONS)
+          ========================================== */}
+      <nav className="nav-tabs-container">
+        <button
+          className={`nav-tab-btn ${activeView === "dashboard" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("dashboard");
+            playSynthSound("pop");
+          }}
+        >
+          <HomeIcon size={18} />
+          <span>Dashboard</span>
+        </button>
 
-      {/* Roster Removal Prompt Modal */}
-      {pendingDeleteStudentId && (
-        <div className="modal-overlay">
-          <div className="modal-content delete-modal">
-            <h3>Confirm Student Removal</h3>
-            <p>To confirm removing <strong>{deleteConfirmationName}</strong>, type their name exactly:</p>
-            <input
-              type="text"
-              placeholder={`Type "${deleteConfirmationName}" here`}
-              value={deleteConfirmationInput}
-              onChange={(e) => setDeleteConfirmationInput(e.target.value)}
-              className="confirmation-input"
-              autoFocus
-            />
-            <div className="modal-actions">
-              <button className="btn-secondary" onClick={() => setPendingDeleteStudentId(null)}>
-                Cancel
-              </button>
-              <button
-                className="btn-danger"
-                onClick={handleConfirmDelete}
-                disabled={deleteConfirmationInput !== deleteConfirmationName}
-              >
-                Remove Student
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+        <button
+          className={`nav-tab-btn ${activeView === "students" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("students");
+            playSynthSound("pop");
+          }}
+        >
+          <Users size={18} />
+          <span>Students ({students.length})</span>
+        </button>
 
-      {/* Header Banner Display */}
-      <section className="hero-band">
-        <div className="hero-content">
-          <h1>Classroom Display Board</h1>
-          <p>
-            Projector view for Sunday School attendance, Faith Points, quizzes, and digital achievements.
-          </p>
-        </div>
-        <div className="hero-stats">
-          <div className="stat-card-widget">
-            <Users size={16} />
-            <div className="stat-label">Students</div>
-            <div className="stat-value">{students.length}</div>
-          </div>
-          <div className="stat-card-widget">
-            <Trophy size={16} />
-            <div className="stat-label">Top Points</div>
-            <div className="stat-value">{rankedStudents[0] ? totalPoints(rankedStudents[0]).earned : 0}</div>
-          </div>
-          <div className="stat-card-widget">
-            <CalendarDays size={16} />
-            <div className="stat-label">Present Today</div>
-            <div className="stat-value">{presentTodayCount}</div>
-          </div>
-        </div>
-      </section>
+        <button
+          className={`nav-tab-btn ${activeView === "attendance" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("attendance");
+            playSynthSound("pop");
+          }}
+        >
+          <CheckSquare size={18} />
+          <span>Attendance</span>
+        </button>
 
-      {/* Sidebar Layout + Main Tabs Navigation */}
-      <div className="board-grid-container">
-        <aside className="sidebar-navigation">
-          <nav className="tab-menu-list">
-            <button className={`tab-btn-link ${activeView === "dashboard" ? "active" : ""}`} onClick={() => setActiveView("dashboard")}>
-              <HomeIcon size={18} />
-              <span>Dashboard</span>
-            </button>
-            <button className={`tab-btn-link ${activeView === "students" ? "active" : ""}`} onClick={() => setActiveView("students")}>
-              <Users size={18} />
-              <span>Students</span>
-            </button>
-            <button className={`tab-btn-link ${activeView === "attendance" ? "active" : ""}`} onClick={() => setActiveView("attendance")}>
-              <CheckSquare size={18} />
-              <span>Attendance</span>
-            </button>
-            <button className={`tab-btn-link ${activeView === "livePoints" ? "active" : ""}`} onClick={() => setActiveView("livePoints")}>
-              <Zap size={18} />
-              <span>Live Points</span>
-            </button>
-            <button className={`tab-btn-link ${activeView === "quizBuilder" ? "active" : ""}`} onClick={() => setActiveView("quizBuilder")}>
-              <ClipboardList size={18} />
-              <span>Quiz Builder</span>
-            </button>
-            <button className={`tab-btn-link ${activeView === "runQuiz" ? "active" : ""}`} onClick={() => setActiveView("runQuiz")}>
-              <Target size={18} />
-              <span>Run Quiz</span>
-              {activeQuiz && <span className="active-dot-live">LIVE</span>}
-            </button>
-            <button className={`tab-btn-link ${activeView === "leaderboard" ? "active" : ""}`} onClick={() => setActiveView("leaderboard")}>
-              <Trophy size={18} />
-              <span>Leaderboard</span>
-            </button>
-            <button className={`tab-btn-link ${activeView === "manage" ? "active" : ""}`} onClick={() => setActiveView("manage")}>
-              <Settings size={18} />
-              <span>Manage Class</span>
-            </button>
-          </nav>
-        </aside>
+        <button
+          className={`nav-tab-btn ${activeView === "livePoints" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("livePoints");
+            playSynthSound("pop");
+          }}
+        >
+          <Zap size={18} />
+          <span>Live Points</span>
+        </button>
 
-        <section className="main-content-display">
-          
-          {/* ==========================================
-              TAB 1: DASHBOARD
-             ========================================== */}
-          {activeView === "dashboard" && (
-            <div className="dashboard-layout-view">
-              
-              {/* Stats Row Widgets */}
-              <div className="stats-row-grid">
-                <div className="dashboard-stat-card card-purple">
-                  <h3>Total Enrolled</h3>
-                  <div className="dash-stat-number">{students.length}</div>
-                  <p className="dash-stat-desc">Active student cards</p>
+        <button
+          className={`nav-tab-btn ${activeView === "quizBuilder" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("quizBuilder");
+            playSynthSound("pop");
+          }}
+        >
+          <BookOpen size={18} />
+          <span>Quiz Builder ({quizzes.length})</span>
+        </button>
+
+        <button
+          className={`nav-tab-btn ${activeView === "runQuiz" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("runQuiz");
+            playSynthSound("pop");
+          }}
+        >
+          <Target size={18} />
+          <span>Run Quiz</span>
+        </button>
+
+        <button
+          className={`nav-tab-btn ${activeView === "leaderboard" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("leaderboard");
+            playSynthSound("pop");
+          }}
+        >
+          <Trophy size={18} />
+          <span>Leaderboard</span>
+        </button>
+
+        <button
+          className={`nav-tab-btn ${activeView === "manage" ? "active" : ""}`}
+          onClick={() => {
+            setActiveView("manage");
+            playSynthSound("pop");
+          }}
+        >
+          <Settings size={18} />
+          <span>Manage</span>
+        </button>
+      </nav>
+
+      {/* ==========================================
+          VIEW 1: DASHBOARD TAB
+          ========================================== */}
+      {activeView === "dashboard" && (
+        <div className="dashboard-grid">
+          {/* Left Column: Spotlight & Quick Actions & Alerts */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Top Student Spotlight Card */}
+            {topStudent ? (
+              <div className="spotlight-card">
+                <div className="spotlight-header">
+                  <div className="spotlight-badge">
+                    <Crown size={16} />
+                    <span>#1 CLASS LEADER</span>
+                  </div>
+                  <span style={{ fontSize: "0.88rem", opacity: 0.85 }}>
+                    {treeLevel(totalPoints(topStudent).earned).name}
+                  </span>
                 </div>
-                <div className="dashboard-stat-card card-green">
-                  <h3>Awarded Today</h3>
-                  <div className="dash-stat-number">+{totalPointsAwardedToday}</div>
-                  <p className="dash-stat-desc">Faith points today</p>
-                </div>
-                <div className="dashboard-stat-card card-teal">
-                  <h3>Present Today</h3>
-                  <div className="dash-stat-number">{presentTodayCount}</div>
-                  <p className="dash-stat-desc">Sunday School + Outreach</p>
-                </div>
-                <div className="dashboard-stat-card card-gold">
-                  <h3>Quiz Catalog</h3>
-                  <div className="dash-stat-number">{quizzes.length}</div>
-                  <p className="dash-stat-desc">Pre-built quiz templates</p>
-                </div>
-              </div>
 
-              {/* Spotlight + Quick Actions Flex Columns */}
-              <div className="dashboard-flex-cols">
-                
-                {/* Spotlight Card column */}
-                <div className="spotlight-column">
-                  <div className="dashboard-widget-card spotlight-container">
-                    <div className="widget-header">
-                      <Trophy size={18} className="icon-gold" />
-                      <h2>Top Student Spotlight</h2>
-                    </div>
-                    {rankedStudents[0] ? (
-                      <div className="spotlight-card-content" onClick={() => { setSelectedStudentId(rankedStudents[0].id); setIsProfileModalOpen(true); }}>
-                        <div className="spotlight-badge-crown">👑 #1 RANKED</div>
-                        <div className="spotlight-avatar">🌟</div>
-                        <h3>{rankedStudents[0].name}</h3>
-                        <div className="spotlight-group">{rankedStudents[0].group}</div>
-                        <div className="spotlight-points">
-                          <span>{totalPoints(rankedStudents[0]).earned}</span> Faith Points
-                        </div>
-                        <div className="spotlight-badges-row">
-                          {(rankedStudents[0].badges || []).slice(0, 4).map((bid) => {
-                            const bDef = badgeDefinitions.find((b) => b.id === bid);
-                            return (
-                              <span key={bid} className="mini-badge-bubble" title={bDef?.name}>
-                                {bDef?.icon || "🏅"}
-                              </span>
-                            );
-                          })}
-                          {(rankedStudents[0].badges || []).length === 0 && <span className="spotlight-no-badges">No badges yet</span>}
-                        </div>
-                        <p className="spotlight-click-tip">Click card to view aquarium & tree</p>
-                      </div>
-                    ) : (
-                      <p className="muted text-center padding-20">No student enrolled yet.</p>
-                    )}
+                <div className="spotlight-body">
+                  <div className="spotlight-avatar">
+                    <span className="spotlight-crown">👑</span>
+                    {topStudent.name.slice(0, 1).toUpperCase()}
                   </div>
 
-                  {/* Distribution Chart Widget */}
-                  <div className="dashboard-widget-card">
-                    <div className="widget-header">
-                      <Sprout size={18} />
-                      <h2>Faith Tree Growth Distribution</h2>
-                    </div>
-                    <div className="tree-distribution-chart">
-                      <div className="distribution-row">
-                        <span className="dist-label">Lvl 5 (Wisdom)</span>
-                        <div className="dist-bar-outer">
-                          <div className="dist-bar-inner lvl-5" style={{ width: `${students.length ? (treeDistribution.level5 / students.length) * 100 : 0}%` }} />
-                        </div>
-                        <span className="dist-count">{treeDistribution.level5}</span>
-                      </div>
-                      <div className="distribution-row">
-                        <span className="dist-label">Lvl 4 (Strong)</span>
-                        <div className="dist-bar-outer">
-                          <div className="dist-bar-inner lvl-4" style={{ width: `${students.length ? (treeDistribution.level4 / students.length) * 100 : 0}%` }} />
-                        </div>
-                        <span className="dist-count">{treeDistribution.level4}</span>
-                      </div>
-                      <div className="distribution-row">
-                        <span className="dist-label">Lvl 3 (Growing)</span>
-                        <div className="dist-bar-outer">
-                          <div className="dist-bar-inner lvl-3" style={{ width: `${students.length ? (treeDistribution.level3 / students.length) * 100 : 0}%` }} />
-                        </div>
-                        <span className="dist-count">{treeDistribution.level3}</span>
-                      </div>
-                      <div className="distribution-row">
-                        <span className="dist-label">Lvl 2 (Plant)</span>
-                        <div className="dist-bar-outer">
-                          <div className="dist-bar-inner lvl-2" style={{ width: `${students.length ? (treeDistribution.level2 / students.length) * 100 : 0}%` }} />
-                        </div>
-                        <span className="dist-count">{treeDistribution.level2}</span>
-                      </div>
-                      <div className="distribution-row">
-                        <span className="dist-label">Lvl 1 (Seed)</span>
-                        <div className="dist-bar-outer">
-                          <div className="dist-bar-inner lvl-1" style={{ width: `${students.length ? (treeDistribution.level1 / students.length) * 100 : 0}%` }} />
-                        </div>
-                        <span className="dist-count">{treeDistribution.level1}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                  <div style={{ flex: 1 }}>
+                    <h2 style={{ fontSize: "1.8rem", margin: "0 0 4px", color: "var(--text-inverse)" }}>
+                      {topStudent.name}
+                    </h2>
+                    <p style={{ margin: "0 0 10px", opacity: 0.85, fontSize: "0.95rem" }}>
+                      {topStudent.group} • {topStudent.badges?.length || 0} Badges Earned
+                    </p>
 
-                {/* Quick actions + Alerts Columns */}
-                <div className="actions-alerts-column">
-                  
-                  {/* Quick Actions Panel */}
-                  <div className="dashboard-widget-card">
-                    <div className="widget-header">
-                      <Zap size={18} className="icon-teal" />
-                      <h2>Teacher Quick-Tools</h2>
-                    </div>
-                    <div className="quick-tools-grid">
-                      <button className="tool-btn" onClick={() => { setActiveView("attendance"); playSynthSound("sparkles"); }}>
-                        <CheckSquare size={20} />
-                        <span>✅ Mark Attendance</span>
-                      </button>
-                      <button className="tool-btn" onClick={() => { setShowQuickAward(true); playSynthSound("sparkles"); }}>
-                        <Zap size={20} />
-                        <span>⚡ Quick Award Points</span>
-                      </button>
-                      <button
-                        className="tool-btn"
-                        disabled={quizzes.length === 0}
-                        onClick={() => {
-                          if (quizzes.length > 0) {
-                            launchQuizSession(quizzes[quizzes.length - 1]);
-                          }
+                    <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+                      <div
+                        style={{
+                          background: "rgba(255, 255, 255, 0.2)",
+                          padding: "6px 14px",
+                          borderRadius: "var(--radius-md)",
+                          fontWeight: 800,
+                          fontSize: "1.2rem",
+                          fontFamily: "Baloo 2"
                         }}
                       >
-                        <Target size={20} />
-                        <span>🎯 Launch Last Quiz</span>
+                        {totalPoints(topStudent).earned} Faith Points
+                      </div>
+
+                      <button
+                        className="clay-btn clay-btn-accent clay-btn-sm"
+                        onClick={() => {
+                          setSelectedStudentId(topStudent.id);
+                          setIsProfileModalOpen(true);
+                          playSynthSound("pop");
+                        }}
+                      >
+                        View Profile & Aquarium
                       </button>
-                      <button className="tool-btn" onClick={() => { setShowAddStudentModal(true); playSynthSound("sparkles"); }}>
-                        <UserPlus size={20} />
-                        <span>➕ Add Student Card</span>
-                      </button>
                     </div>
                   </div>
-
-                  {/* Class Health Alerts */}
-                  <div className="dashboard-widget-card health-alerts-card">
-                    <div className="widget-header">
-                      <AlertCircle size={18} className="icon-rose" />
-                      <h2>Classroom Growth Alerts</h2>
-                    </div>
-                    <div className="alerts-list">
-                      {dashboardAlerts.map((alert, index) => (
-                        <div key={index} className="alert-item-row">
-                          <span className="alert-bullet">🔸</span>
-                          <span className="alert-text">{alert}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Recent Activity Log Feed */}
-                  <div className="dashboard-widget-card recent-feed-card">
-                    <div className="widget-header">
-                      <Activity size={18} />
-                      <h2>Recent Activities Feed</h2>
-                    </div>
-                    <div className="recent-feed-list">
-                      {recentActivitiesFeed.map((act) => (
-                        <div key={act.id} className="feed-item-row">
-                          <div className="feed-left">
-                            <span className="feed-student">{act.studentName}</span>
-                            <span className="feed-label">{act.label}</span>
-                            <span className="feed-date">{act.date}</span>
-                          </div>
-                          <div className="feed-right">
-                            <span className={`feed-pts ${act.points >= 15 ? "pts-high" : "pts-normal"}`}>
-                              +{act.points} pts
-                            </span>
-                          </div>
-                        </div>
-                      ))}
-                      {recentActivitiesFeed.length === 0 && (
-                        <p className="muted padding-15 text-center">No awards given yet today.</p>
-                      )}
-                    </div>
-                  </div>
-
                 </div>
+              </div>
+            ) : null}
 
+            {/* Quick Tools Panel */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.3rem", marginBottom: "4px" }}>⚡ Teacher Quick Actions</h3>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                Execute the most frequent classroom tasks without switching tabs.
+              </p>
+
+              <div className="quick-tools-grid">
+                <button
+                  className="quick-tool-btn"
+                  onClick={() => setShowQuickAttendance(true)}
+                >
+                  <CheckSquare size={24} color="var(--primary)" />
+                  <span>Mark Attendance</span>
+                </button>
+
+                <button
+                  className="quick-tool-btn"
+                  onClick={() => setShowQuickAward(true)}
+                >
+                  <Zap size={24} color="var(--accent)" />
+                  <span>Quick Award</span>
+                </button>
+
+                <button
+                  className="quick-tool-btn"
+                  onClick={() => {
+                    if (quizzes.length > 0) {
+                      setActiveQuiz(quizzes[0]);
+                      setQuizQuestionIndex(0);
+                      setQuizStage("question");
+                      setActiveView("runQuiz");
+                    } else {
+                      setActiveView("quizBuilder");
+                    }
+                    playSynthSound("pop");
+                  }}
+                >
+                  <Play size={24} color="var(--purple)" />
+                  <span>Launch Quiz</span>
+                </button>
+
+                <button
+                  className="quick-tool-btn"
+                  onClick={() => setShowAddStudentModal(true)}
+                >
+                  <UserPlus size={24} color="var(--success)" />
+                  <span>Add Student</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Class Health Alerts */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.3rem", marginBottom: "12px" }}>🔔 Class Insights & Highlights</h3>
+
+              <div className="alert-item alert-item-success">
+                <Sparkles size={20} color="var(--success)" style={{ flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  <strong>Great Engagement!</strong> {presentTodayCount} of {students.length} students have participated in today's activities.
+                </div>
               </div>
 
-              {/* Dashboard Modals */}
-              {showQuickAward && (
-                <div className="modal-overlay">
-                  <div className="modal-content">
-                    <div className="modal-header-row">
-                      <h2>Quick Award Points</h2>
-                      <button className="close-modal-btn" onClick={() => setShowQuickAward(false)}>
-                        <X size={20} />
-                      </button>
-                    </div>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        const stId = quickAwardStudentId || (students[0] ? students[0].id : "");
-                        if (!stId) return;
-                        awardPoints(stId, Number(quickAwardAmount) || 10, quickAwardLabel || "Teacher Award");
-                        setShowQuickAward(false);
-                        setQuickAwardLabel("");
-                      }}
-                      className="modal-form"
-                    >
-                      <div className="form-group-item">
-                        <label>Select Student</label>
-                        <select
-                          value={quickAwardStudentId}
-                          onChange={(e) => setQuickAwardStudentId(e.target.value)}
-                        >
-                          <option value="">-- Choose student --</option>
-                          {students.map((s) => (
-                            <option key={s.id} value={s.id}>
-                              {s.name} ({totalPoints(s).earned} pts)
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="form-group-item">
-                        <label>Award Points</label>
-                        <select
-                          value={quickAwardAmount}
-                          onChange={(e) => setQuickAwardAmount(Number(e.target.value))}
-                        >
-                          <option value="5">+5 Points</option>
-                          <option value="10">+10 Points</option>
-                          <option value="15">+15 Points</option>
-                          <option value="20">+20 Points</option>
-                          <option value="50">+50 Points</option>
-                        </select>
-                      </div>
-                      <div className="form-group-item">
-                        <label>Description / Reason</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Recited Memory Verse, Helped classmate"
-                          value={quickAwardLabel}
-                          onChange={(e) => setQuickAwardLabel(e.target.value)}
-                        />
-                      </div>
-                      <button type="submit" className="btn-primary form-submit-btn">
-                        Award Points Now
-                      </button>
-                    </form>
+              {topStudent && (
+                <div className="alert-item">
+                  <Trophy size={20} color="var(--primary)" style={{ flexShrink: 0, marginTop: "2px" }} />
+                  <div>
+                    <strong>Milestone Alert:</strong> {topStudent.name} is leading with {totalPoints(topStudent).earned} Faith Points!
                   </div>
                 </div>
               )}
 
-              {showAddStudentModal && (
-                <div className="modal-overlay">
-                  <div className="modal-content">
-                    <div className="modal-header-row">
-                      <h2>Add Student Card</h2>
-                      <button className="close-modal-btn" onClick={() => setShowAddStudentModal(false)}>
-                        <X size={20} />
-                      </button>
-                    </div>
-                    <form
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleAddStudent(newStudentName, newStudentGroup);
-                        setShowAddStudentModal(false);
-                        setNewStudentName("");
-                      }}
-                      className="modal-form"
-                    >
-                      <div className="form-group-item">
-                        <label>Student Name</label>
-                        <input
-                          type="text"
-                          placeholder="Enter full name"
-                          value={newStudentName}
-                          onChange={(e) => setNewStudentName(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group-item">
-                        <label>Class/Group</label>
-                        <select
-                          value={newStudentGroup}
-                          onChange={(e) => setNewStudentGroup(e.target.value)}
+              <div className="alert-item alert-item-warning">
+                <Flame size={20} color="var(--accent)" style={{ flexShrink: 0, marginTop: "2px" }} />
+                <div>
+                  <strong>Scripture Challenge:</strong> Memorize weekly Bible verses to unlock the exclusive "Scripture Master" badge.
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Live Activity Feed & Tree Distribution */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Live Activity Stream */}
+            <div className="clay-card" style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "14px" }}>
+                <h3 style={{ fontSize: "1.3rem" }}>📜 Recent Points Activity</h3>
+                <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>Last 15 events</span>
+              </div>
+
+              {recentActivities.length === 0 ? (
+                <p style={{ color: "var(--text-muted)", textAlign: "center", padding: "30px 0" }}>
+                  No point awards recorded yet. Tap "Quick Award" or "Live Points" to get started!
+                </p>
+              ) : (
+                <div className="activity-feed-list">
+                  {recentActivities.map(({ studentName, activity }) => (
+                    <div key={activity.id} className="activity-feed-item">
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <div
+                          style={{
+                            width: "36px",
+                            height: "36px",
+                            borderRadius: "var(--radius-md)",
+                            background: "var(--primary-surface)",
+                            color: "var(--primary)",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontFamily: "Baloo 2",
+                            fontWeight: 800
+                          }}
                         >
-                          <option value="Sunday School">Sunday School</option>
-                          <option value="Outreach Youth">Outreach Youth</option>
-                          <option value="Youth Bible Class">Youth Bible Class</option>
-                          <option value="Primary Class">Primary Class</option>
-                        </select>
+                          {studentName.slice(0, 1)}
+                        </div>
+                        <div>
+                          <strong style={{ display: "block", fontSize: "0.98rem" }}>{studentName}</strong>
+                          <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{activity.label}</span>
+                        </div>
                       </div>
-                      <button type="submit" className="btn-primary form-submit-btn">
-                        Create Card
-                      </button>
-                    </form>
-                  </div>
+
+                      <div style={{ textAlign: "right" }}>
+                        <span
+                          style={{
+                            fontFamily: "Baloo 2",
+                            fontWeight: 800,
+                            color: "var(--primary)",
+                            fontSize: "1.1rem"
+                          }}
+                        >
+                          +{activity.points}
+                        </span>
+                        <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>
+                          {formatCalendarDate(activity.date)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
-
             </div>
-          )}
 
-          {/* ==========================================
-              TAB 2: STUDENTS GRID & SIDEBAR
-             ========================================== */}
-          {activeView === "students" && (
-            <div className="students-layout-view">
-              
-              <div className="tab-actions-header">
-                <div className="search-filter-box">
-                  <Search size={18} />
-                  <input
-                    type="text"
-                    placeholder="Search students by name or class..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                  />
-                </div>
-              </div>
-
-              <div className="students-view-columns">
-                
-                {/* Students Cards Grid (left column) */}
-                <div className="student-grid-col">
-                  <div className="student-cards-grid">
-                    {rankedStudents
-                      .filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()) || s.group.toLowerCase().includes(searchQuery.toLowerCase()))
-                      .map((s) => {
-                        const pts = totalPoints(s);
-                        const lvl = treeLevel(pts.earned);
-                        return (
-                          <div
-                            key={s.id}
-                            className="student-main-card clickable-card"
-                            onClick={() => {
-                              setSelectedStudentId(s.id);
-                              setIsProfileModalOpen(true);
-                              playSynthSound("sparkles");
-                            }}
-                          >
-                            <div className="card-top-decorator">
-                              <span className={`tree-level-badge level-${lvl.level}`}>
-                                Lvl {lvl.level}
-                              </span>
-                            </div>
-                            <div className="card-avatar">⭐</div>
-                            <h3>{s.name}</h3>
-                            <span className="card-group-tag">{s.group}</span>
-                            
-                            <div className="card-metrics-row">
-                              <div className="metric-box">
-                                <span className="metric-val">{pts.earned}</span>
-                                <span className="metric-lbl">Earned Pts</span>
-                              </div>
-                              <div className="metric-box">
-                                <span className="metric-val">{(s.badges || []).length}</span>
-                                <span className="metric-lbl">Badges</span>
-                              </div>
-                            </div>
-
-                            <div className="card-badges-preview">
-                              {(s.badges || []).slice(0, 3).map((bid) => {
-                                const b = badgeDefinitions.find((def) => def.id === bid);
-                                return (
-                                  <span key={bid} className="preview-badge-emoji" title={b?.name}>
-                                    {b?.icon || "🏅"}
-                                  </span>
-                                );
-                              })}
-                              {(s.badges || []).length === 0 && <span className="no-badges-label">No badges unlocked</span>}
-                            </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-                </div>
-
-                {/* Badge Info Sidebar (right column) */}
-                <aside className="badge-info-sidebar">
-                  <div className="sidebar-card">
-                    <div className="sidebar-header">
-                      <Award size={18} />
-                      <h2>How to Earn Badges</h2>
-                    </div>
-                    <p className="sidebar-intro">
-                      Badges are automatically awarded immediately when criteria are achieved.
-                    </p>
-                    <div className="badges-definitions-list">
-                      {badgeDefinitions.map((b) => (
-                        <div key={b.id} className="badge-definition-row">
-                          <div className="badge-icon-cell">{b.icon}</div>
-                          <div className="badge-info-cell">
-                            <h4>{b.name}</h4>
-                            <p>{b.description}</p>
-                            <span className="badge-cat-tag">{b.category}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </aside>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* ==========================================
-              TAB 3: ATTENDANCE (SPLIT VIEW)
-             ========================================== */}
-          {activeView === "attendance" && (
-            <div className="attendance-layout-view">
-              
-              {/* Shared Date Selector Top Bar */}
-              <div className="shared-date-bar">
-                <div className="date-picker-box">
-                  <CalendarDays size={20} />
-                  <label htmlFor="attendance-date-select">Attendance Date:</label>
-                  <input
-                    id="attendance-date-select"
-                    type="date"
-                    value={attendanceDate}
-                    onChange={(e) => setAttendanceDate(e.target.value)}
-                  />
-                </div>
-                <div className="date-display-title">
-                  {formatCalendarDate(attendanceDate)}
-                </div>
-              </div>
-
-              {/* Side-by-Side SS and Outreach Columns */}
-              <div className="attendance-split-container">
-                
-                {/* Left panel: Sunday School */}
-                <div className="attendance-panel-column ss-panel">
-                  <div className="panel-header-row">
-                    <div className="panel-title-group">
-                      <GraduationCap size={22} className="title-icon" />
-                      <h2>Sunday School</h2>
-                      <span className="pts-tag">+10 points</span>
-                    </div>
-                    <button className="btn-secondary btn-mini" onClick={markAllSSPresent}>
-                      Mark All Present
-                    </button>
-                  </div>
-                  
-                  <div className="panel-summary-label">
-                    Present: <strong>{ssPresentList.length}</strong> of {students.length} students
-                  </div>
-
-                  <div className="attendance-students-list">
-                    {students.map((s) => {
-                      const isPresent = ssPresentList.includes(s.id);
-                      return (
-                        <div key={s.id} className={`attendance-row-item ${isPresent ? "present" : "absent"}`}>
-                          <span className="student-name">{s.name}</span>
-                          <button
-                            className={`toggle-attendance-btn ${isPresent ? "checked" : "unchecked"}`}
-                            onClick={() => toggleSundaySchool(s.id, !isPresent)}
-                          >
-                            {isPresent ? "Present ✓" : "Absent"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Right panel: Outreach */}
-                <div className="attendance-panel-column outreach-panel">
-                  <div className="panel-header-row">
-                    <div className="panel-title-group">
-                      <Sprout size={22} className="title-icon" />
-                      <h2>Outreach Events</h2>
-                      <span className="pts-tag">+15 points</span>
-                    </div>
-                    <button className="btn-secondary btn-mini" onClick={markAllOutreachPresent}>
-                      Mark All Present
-                    </button>
-                  </div>
-                  
-                  <div className="panel-summary-label">
-                    Present: <strong>{outreachPresentList.length}</strong> of {students.length} students
-                  </div>
-
-                  <div className="attendance-students-list">
-                    {students.map((s) => {
-                      const isPresent = outreachPresentList.includes(s.id);
-                      return (
-                        <div key={s.id} className={`attendance-row-item ${isPresent ? "present" : "absent"}`}>
-                          <span className="student-name">{s.name}</span>
-                          <button
-                            className={`toggle-attendance-btn ${isPresent ? "checked" : "unchecked"}`}
-                            onClick={() => toggleOutreach(s.id, !isPresent)}
-                          >
-                            {isPresent ? "Present ✓" : "Absent"}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* ==========================================
-              TAB 4: LIVE POINTS INDIVIDUAL AWARDING
-             ========================================== */}
-          {activeView === "livePoints" && (
-            <div className="live-points-layout-view">
-              
-              {/* Award Action Header Config */}
-              <div className="live-points-config-card">
-                <h2>⚡ Live Points Award Board</h2>
-                <p>Award points to students on the spot during scripture sessions, questions, or discussions.</p>
-                <div className="label-input-group">
-                  <label>Award Label / Activity Reason:</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Brought Bible, Recited Psalm 23, Helped arrange chairs"
-                    value={livePointsLabel}
-                    onChange={(e) => setLivePointsLabel(e.target.value)}
-                    className="full-width-input"
-                  />
-                </div>
-              </div>
-
-              {/* Roster Cards with Direct Preset Actions */}
-              <div className="live-students-action-grid">
-                {rankedStudents.map((s) => {
-                  const pts = totalPoints(s);
-                  const sessionGain = sessionGains[s.id] || 0;
+            {/* Tree Level Distribution Chart */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.25rem", marginBottom: "12px" }}>🌳 Faith Tree Class Levels</h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                {Object.entries(treeDistribution).map(([stageName, count]) => {
+                  const pct = students.length > 0 ? Math.round((count / students.length) * 100) : 0;
                   return (
-                    <div key={s.id} className="live-award-card">
-                      <div className="live-card-body">
-                        <h3>{s.name}</h3>
-                        <span className="live-card-group">{s.group}</span>
-                        <div className="live-card-current-pts">
-                          Current total: <strong>{pts.earned}</strong> pts
-                        </div>
-                        {sessionGain > 0 && (
-                          <div className="live-card-session-gain">
-                            Gained this session: <span>+{sessionGain} pts</span>
-                          </div>
-                        )}
+                    <div key={stageName} style={{ display: "flex", flexDirection: "column", gap: "3px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.86rem" }}>
+                        <strong>{stageName}</strong>
+                        <span>
+                          {count} student{count === 1 ? "" : "s"} ({pct}%)
+                        </span>
                       </div>
-                      
-                      <div className="live-card-presets-grid">
-                        <button className="preset-btn p-5" onClick={() => awardPoints(s.id, 5, livePointsLabel || "Teacher Award")}>
-                          +5
-                        </button>
-                        <button className="preset-btn p-10" onClick={() => awardPoints(s.id, 10, livePointsLabel || "Teacher Award")}>
-                          +10
-                        </button>
-                        <button className="preset-btn p-15" onClick={() => awardPoints(s.id, 15, livePointsLabel || "Teacher Award")}>
-                          +15
-                        </button>
-                        <button className="preset-btn p-20" onClick={() => awardPoints(s.id, 20, livePointsLabel || "Teacher Award")}>
-                          +20
-                        </button>
+                      <div
+                        style={{
+                          height: "10px",
+                          borderRadius: "var(--radius-full)",
+                          background: "var(--card-surface-alt)",
+                          overflow: "hidden",
+                          border: "1px solid var(--card-border)"
+                        }}
+                      >
+                        <div
+                          style={{
+                            height: "100%",
+                            width: `${pct}%`,
+                            background: "linear-gradient(90deg, var(--primary-light), var(--primary))",
+                            borderRadius: "var(--radius-full)",
+                            transition: "width 0.4s ease"
+                          }}
+                        />
                       </div>
                     </div>
                   );
                 })}
               </div>
-
-              {/* Running Session Activity log */}
-              <div className="session-activity-log-widget">
-                <div className="session-log-header">
-                  <h2>Session Activities Log</h2>
-                  <button
-                    className="btn-secondary btn-mini"
-                    onClick={() => {
-                      setSessionActivityLog([]);
-                      setSessionGains({});
-                      playSynthSound("splash");
-                    }}
-                  >
-                    Reset Session Log
-                  </button>
-                </div>
-                
-                <div className="session-log-table-container">
-                  <table className="session-log-table">
-                    <thead>
-                      <tr>
-                        <th>Time</th>
-                        <th>Student</th>
-                        <th>Activity Label</th>
-                        <th>Points Awarded</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sessionActivityLog.map((log) => (
-                        <tr key={log.id}>
-                          <td>{log.time}</td>
-                          <td><strong>{log.studentName}</strong></td>
-                          <td>{log.label}</td>
-                          <td><span className="points-added-cell">+{log.points}</span></td>
-                        </tr>
-                      ))}
-                      {sessionActivityLog.length === 0 && (
-                        <tr>
-                          <td colSpan={4} className="muted text-center py-20">
-                            No activities logged in this active screen session.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ==========================================
-              TAB 5: QUIZ BUILDER FORM
-             ========================================== */}
-          {activeView === "quizBuilder" && (
-            <div className="quiz-builder-layout-view">
-              
-              <div className="builder-split-flex">
-                
-                {/* Builder editor form */}
-                <div className="builder-editor-card">
-                  <h2>{editingQuizId ? "📝 Edit Saved Quiz" : "📝 Pre-Build New Trivia Quiz"}</h2>
-                  <form onSubmit={handleSaveQuiz} className="quiz-editor-form">
-                    
-                    <div className="builder-form-row">
-                      <div className="form-group-item">
-                        <label>Quiz Title</label>
-                        <input
-                          type="text"
-                          placeholder="e.g. Fruit of the Spirit Quiz"
-                          value={builderTitle}
-                          onChange={(e) => setBuilderTitle(e.target.value)}
-                          required
-                        />
-                      </div>
-                      <div className="form-group-item points-per-q">
-                        <label>Points Per Question</label>
-                        <input
-                          type="number"
-                          value={builderPoints}
-                          onChange={(e) => setBuilderPoints(Math.max(1, Number(e.target.value)))}
-                          required
-                        />
-                      </div>
-                    </div>
-
-                    <hr className="builder-hr" />
-
-                    <div className="builder-questions-header">
-                      <h3>Questions Setup</h3>
-                      <button type="button" className="btn-secondary btn-mini" onClick={handleAddQuestion}>
-                        ➕ Add Question
-                      </button>
-                    </div>
-
-                    <div className="builder-questions-scroller">
-                      {builderQuestions.map((q, qIdx) => (
-                        <div key={q.id || qIdx} className="question-setup-box">
-                          <div className="q-header-row">
-                            <span className="q-index-tag">Question #{qIdx + 1}</span>
-                            <button
-                              type="button"
-                              className="btn-danger btn-mini"
-                              disabled={builderQuestions.length <= 1}
-                              onClick={() => handleRemoveQuestion(qIdx)}
-                            >
-                              Remove Q
-                            </button>
-                          </div>
-
-                          <div className="form-group-item q-text-input">
-                            <label>Question Text:</label>
-                            <input
-                              type="text"
-                              placeholder="e.g. What is the first book of the Bible?"
-                              value={q.question}
-                              onChange={(e) => handleQuestionChange(qIdx, e.target.value)}
-                              required
-                            />
-                          </div>
-
-                          <div className="options-setup-group">
-                            <label>Answer Options & Correct Indicator:</label>
-                            {q.options.map((opt, oIdx) => (
-                              <div key={oIdx} className="option-row-item">
-                                <input
-                                  type="radio"
-                                  name={`correct-option-${qIdx}`}
-                                  checked={q.correctIndex === oIdx}
-                                  onChange={() => handleSetCorrectOption(qIdx, oIdx)}
-                                  title="Mark as correct answer"
-                                />
-                                <span className="option-letter">{(oIdx + 10).toString(36).toUpperCase()}.</span>
-                                <input
-                                  type="text"
-                                  placeholder={`Option ${oIdx + 1}`}
-                                  value={opt}
-                                  onChange={(e) => handleOptionChange(qIdx, oIdx, e.target.value)}
-                                  required
-                                />
-                                <button
-                                  type="button"
-                                  className="btn-remove-opt"
-                                  disabled={q.options.length <= 2}
-                                  onClick={() => handleRemoveOption(qIdx, oIdx)}
-                                  title="Remove option"
-                                >
-                                  ×
-                                </button>
-                              </div>
-                            ))}
-                            {q.options.length < 6 && (
-                              <button
-                                type="button"
-                                className="btn-add-opt"
-                                onClick={() => handleAddOption(qIdx)}
-                              >
-                                ＋ Add Option
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div className="builder-actions-footer">
-                      {editingQuizId && (
-                        <button
-                          type="button"
-                          className="btn-secondary"
-                          onClick={() => {
-                            setEditingQuizId(null);
-                            setBuilderTitle("");
-                            setBuilderQuestions([{ id: `q-${Date.now()}-0`, question: "", options: ["", ""], correctIndex: 0 }]);
-                          }}
-                        >
-                          Cancel Editing
-                        </button>
-                      )}
-                      <button type="submit" className="btn-primary">
-                        {editingQuizId ? "Update Quiz Template" : "Save Quiz to Library"}
-                      </button>
-                    </div>
-
-                  </form>
-                </div>
-
-                {/* Quizzes library list */}
-                <div className="quizzes-library-card">
-                  <h2>📂 Quiz Template Library</h2>
-                  <p>Quizzes stored on this device ready to run live with the class.</p>
-                  
-                  <div className="saved-quizzes-list-scroller">
-                    {quizzes.map((quiz) => (
-                      <div key={quiz.id} className="quiz-library-item">
-                        <div className="quiz-item-header">
-                          <h3>{quiz.title}</h3>
-                          <span className="item-meta">
-                            {quiz.questions.length} questions • {quiz.pointsPerCorrect} pts/each
-                          </span>
-                        </div>
-                        <div className="quiz-item-actions">
-                          <button className="btn-action launch" onClick={() => launchQuizSession(quiz)}>
-                            <Play size={14} />
-                            <span>Launch Live</span>
-                          </button>
-                          <button className="btn-action edit" onClick={() => handleEditQuiz(quiz)}>
-                            <Edit size={14} />
-                          </button>
-                          <button className="btn-action delete" onClick={() => handleDeleteQuiz(quiz.id)}>
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                    {quizzes.length === 0 && (
-                      <p className="muted py-40 text-center">No quizzes saved in library yet.</p>
-                    )}
-                  </div>
-                </div>
-
-              </div>
-
-            </div>
-          )}
-
-          {/* ==========================================
-              TAB 6: LIVE RUN QUIZ
-             ========================================== */}
-          {activeView === "runQuiz" && (
-            <div className="run-quiz-layout-view">
-              
-              {!activeQuiz ? (
-                <div className="run-quiz-idle-card">
-                  <Target size={48} className="idle-target-icon" />
-                  <h2>No Live Quiz Active</h2>
-                  <p>Go to the <strong>Quiz Builder</strong> tab to select and launch a prebuilt quiz template.</p>
-                  <button className="btn-primary" onClick={() => setActiveView("quizBuilder")}>
-                    Open Quiz Builder
-                  </button>
-                </div>
-              ) : (
-                <div className="quiz-active-session-container">
-                  
-                  {/* Progress Indicator */}
-                  <div className="quiz-progress-indicator-bar">
-                    <span className="quiz-title-tag">Live Session: {activeQuiz.title}</span>
-                    <div className="progress-pills">
-                      {activeQuiz.questions.map((_, idx) => (
-                        <span
-                          key={idx}
-                          className={`progress-pill ${idx === quizQuestionIndex ? "active" : ""} ${idx < quizQuestionIndex ? "completed" : ""}`}
-                        />
-                      ))}
-                    </div>
-                    <span className="progress-fraction-label">
-                      Question {quizQuestionIndex + 1} of {activeQuiz.questions.length}
-                    </span>
-                  </div>
-
-                  {/* ACTIVE QUESTION SCREEN */}
-                  {quizState === "question" && (
-                    <div className="quiz-state-panel question-presentation">
-                      <div className="question-text-box">
-                        <h3>QUESTION #{quizQuestionIndex + 1}</h3>
-                        <h1>{activeQuiz.questions[quizQuestionIndex].question}</h1>
-                      </div>
-                      
-                      <div className="options-display-grid">
-                        {activeQuiz.questions[quizQuestionIndex].options.map((opt, oIdx) => (
-                          <div key={oIdx} className="option-present-card">
-                            <span className="opt-letter">{(oIdx + 10).toString(36).toUpperCase()}</span>
-                            <span className="opt-text">{opt}</span>
-                          </div>
-                        ))}
-                      </div>
-
-                      <div className="quiz-action-footer-panel">
-                        <button className="btn-primary reveal-btn" onClick={() => { setQuizState("reveal"); playSynthSound("success"); }}>
-                          Reveal Correct Answer
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* REVEAL CORRECT ANSWER SCREEN */}
-                  {quizState === "reveal" && (
-                    <div className="quiz-state-panel reveal-presentation">
-                      <div className="question-text-box">
-                        <h3>QUESTION #{quizQuestionIndex + 1} REVEALED</h3>
-                        <h1>{activeQuiz.questions[quizQuestionIndex].question}</h1>
-                      </div>
-                      
-                      <div className="options-display-grid">
-                        {activeQuiz.questions[quizQuestionIndex].options.map((opt, oIdx) => {
-                          const isCorrect = oIdx === activeQuiz.questions[quizQuestionIndex].correctIndex;
-                          return (
-                            <div key={oIdx} className={`option-present-card ${isCorrect ? "correct-highlight-card" : "incorrect-dim-card"}`}>
-                              <span className="opt-letter">{(oIdx + 10).toString(36).toUpperCase()}</span>
-                              <span className="opt-text">{opt}</span>
-                              {isCorrect && <span className="correct-stamp">CORRECT ✓</span>}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Awarding Picker Grid */}
-                      <div className="student-quiz-scoring-widget">
-                        <h3>Tap students who got this answer correct:</h3>
-                        <p className="scoring-subtext">Each tap awards +{activeQuiz.pointsPerCorrect} points to the student card.</p>
-                        
-                        <div className="scoring-students-picker-grid">
-                          {students.map((s) => {
-                            const isSelected = (correctStudentsMap[activeQuiz.questions[quizQuestionIndex].id] || []).includes(s.id);
-                            return (
-                              <button
-                                key={s.id}
-                                className={`scoring-student-btn-card ${isSelected ? "selected-correct" : ""}`}
-                                onClick={() => handleToggleCorrectStudent(s.id)}
-                              >
-                                <span className="check-indicator-circle">{isSelected ? "✓" : ""}</span>
-                                <span className="s-name">{s.name}</span>
-                                <span className="s-points-earned">+{quizSessionPoints[s.id] || 0} pts</span>
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      <div className="quiz-action-footer-panel">
-                        <button className="btn-primary next-q-btn" onClick={handleNextQuestion}>
-                          {quizQuestionIndex < activeQuiz.questions.length - 1 ? "Next Question ➜" : "Show Quiz Results ➜"}
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* RESULTS SCREEN */}
-                  {quizState === "results" && (
-                    <div className="quiz-state-panel results-presentation">
-                      <div className="quiz-results-banner">
-                        <Trophy size={42} className="banner-trophy-gold" />
-                        <h1>Quiz Session Completed!</h1>
-                        <p>Here are the rankings for this quiz session.</p>
-                      </div>
-
-                      <div className="session-ranking-table-widget">
-                        <table className="session-results-table">
-                          <thead>
-                            <tr>
-                              <th>Session Rank</th>
-                              <th>Student Name</th>
-                              <th>Correct Questions</th>
-                              <th>Points Earned</th>
-                              <th>Overall Rank Change</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {/* Sort students by session correct answers */}
-                            {[...students]
-                              .sort((a, b) => (quizSessionPoints[b.id] || 0) - (quizSessionPoints[a.id] || 0))
-                              .map((s, idx) => {
-                                const ptsGained = quizSessionPoints[s.id] || 0;
-                                const questionsCorrect = ptsGained / activeQuiz.pointsPerCorrect;
-                                
-                                // Calculate rank change
-                                const snapRank = quizRankSnapshot[s.id] || idx + 1;
-                                // find current rank in general list
-                                const currentRankIdx = rankedStudents.findIndex((student) => student.id === s.id);
-                                const currRank = currentRankIdx !== -1 ? currentRankIdx + 1 : idx + 1;
-                                const rankDiff = snapRank - currRank; // positive means rank increased (e.g. 5 -> 3)
-                                
-                                return (
-                                  <tr key={s.id} className={idx < 3 ? `podium-row podium-${idx + 1}` : ""}>
-                                    <td><strong>#{idx + 1}</strong></td>
-                                    <td><strong>{s.name}</strong></td>
-                                    <td>{questionsCorrect} / {activeQuiz.questions.length}</td>
-                                    <td><span className="pts-badge-green">+{ptsGained} pts</span></td>
-                                    <td>
-                                      {rankDiff > 0 ? (
-                                        <span className="rank-change up">▲ +{rankDiff}</span>
-                                      ) : rankDiff < 0 ? (
-                                        <span className="rank-change down">▼ {rankDiff}</span>
-                                      ) : (
-                                        <span className="rank-change same">-</span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                          </tbody>
-                        </table>
-                      </div>
-
-                      <div className="quiz-action-footer-panel">
-                        <button className="btn-primary finish-btn" onClick={handleFinishQuiz}>
-                          Finish & Close Session
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                </div>
-              )}
-
-            </div>
-          )}
-
-          {/* ==========================================
-              TAB 7: LEADERBOARD RANKINGS
-             ========================================== */}
-          {activeView === "leaderboard" && (
-            <div className="leaderboard-layout-view">
-              
-              {/* Podium display for top 3 */}
-              <div className="podium-display-container">
-                
-                {/* 2nd Place (Silver) */}
-                {rankedStudents[1] && (
-                  <div className="podium-pedestal silver-pedestal animate-podium-2">
-                    <div className="podium-avatar">🥈</div>
-                    <div className="pedestal-body">
-                      <h3>{rankedStudents[1].name}</h3>
-                      <div className="pedestal-points">{totalPoints(rankedStudents[1]).earned} pts</div>
-                      <div className="pedestal-num">2</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 1st Place (Gold) */}
-                {rankedStudents[0] && (
-                  <div className="podium-pedestal gold-pedestal animate-podium-1">
-                    <div className="podium-avatar">👑 🥇</div>
-                    <div className="pedestal-body">
-                      <h3>{rankedStudents[0].name}</h3>
-                      <div className="pedestal-points">{totalPoints(rankedStudents[0]).earned} pts</div>
-                      <div className="pedestal-num">1</div>
-                    </div>
-                  </div>
-                )}
-
-                {/* 3rd Place (Bronze) */}
-                {rankedStudents[2] && (
-                  <div className="podium-pedestal bronze-pedestal animate-podium-3">
-                    <div className="podium-avatar">🥉</div>
-                    <div className="pedestal-body">
-                      <h3>{rankedStudents[2].name}</h3>
-                      <div className="pedestal-points">{totalPoints(rankedStudents[2]).earned} pts</div>
-                      <div className="pedestal-num">3</div>
-                    </div>
-                  </div>
-                )}
-
-              </div>
-
-              {/* Complete rankings list table */}
-              <div className="rankings-table-card">
-                <h2>Roster Standings</h2>
-                <div className="table-responsive">
-                  <table className="rankings-table">
-                    <thead>
-                      <tr>
-                        <th>Rank</th>
-                        <th>Student Name</th>
-                        <th>Class Group</th>
-                        <th>Tree Level</th>
-                        <th>Unlocked Badges</th>
-                        <th>Total Earned Points</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankedStudents.map((s, idx) => {
-                        const pts = totalPoints(s);
-                        const lvl = treeLevel(pts.earned);
-                        return (
-                          <tr key={s.id} className={idx < 3 ? "highlight-top-row" : ""}>
-                            <td><strong>#{idx + 1}</strong></td>
-                            <td>
-                              <span className="rankings-s-name">{s.name}</span>
-                            </td>
-                            <td>{s.group}</td>
-                            <td>
-                              <span className={`tree-level-tag lvl-${lvl.level}`}>
-                                Level {lvl.level}: {lvl.name}
-                              </span>
-                            </td>
-                            <td>
-                              <div className="rankings-badges-cell">
-                                {(s.badges || []).map((bid) => {
-                                  const b = badgeDefinitions.find((def) => def.id === bid);
-                                  return (
-                                    <span key={bid} className="rankings-badge-emoji" title={b?.name}>
-                                      {b?.icon || "🏅"}
-                                    </span>
-                                  );
-                                })}
-                                {(s.badges || []).length === 0 && <span className="no-badges-dash">-</span>}
-                              </div>
-                            </td>
-                            <td><strong>{pts.earned} pts</strong></td>
-                          </tr>
-                        );
-                      })}
-                      {rankedStudents.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="muted text-center py-40">
-                            No students enrolled in class.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-          {/* ==========================================
-              TAB 8: MANAGE CLASS
-             ========================================== */}
-          {activeView === "manage" && (
-            <div className="manage-layout-view">
-              
-              <div className="manage-flex-grid">
-                
-                {/* Left side: Add student */}
-                <div className="manage-card-panel add-student-panel">
-                  <h2>➕ Enroll New Student Card</h2>
-                  <p>Register a student to the local display board. Card stats are stored locally on this device.</p>
-                  
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAddStudent(newStudentName, newStudentGroup);
-                      setNewStudentName("");
-                    }}
-                    className="manage-form"
-                  >
-                    <div className="form-group-item">
-                      <label>Student Name</label>
-                      <input
-                        type="text"
-                        placeholder="Enter full name"
-                        value={newStudentName}
-                        onChange={(e) => setNewStudentName(e.target.value)}
-                        required
-                      />
-                    </div>
-                    <div className="form-group-item">
-                      <label>Class/Group Assignment</label>
-                      <select
-                        value={newStudentGroup}
-                        onChange={(e) => setNewStudentGroup(e.target.value)}
-                      >
-                        <option value="Sunday School">Sunday School</option>
-                        <option value="Outreach Youth">Outreach Youth</option>
-                        <option value="Youth Bible Class">Youth Bible Class</option>
-                        <option value="Primary Class">Primary Class</option>
-                      </select>
-                    </div>
-                    <button type="submit" className="btn-primary btn-full-width">
-                      Enroll Student Card
-                    </button>
-                  </form>
-                </div>
-
-                {/* Right side: Database / backup operations */}
-                <div className="manage-card-panel db-ops-panel">
-                  <h2>⚙️ Database & Backup Operations</h2>
-                  <p>Export class roster reports, and backup data before transitioning computers or projection devices.</p>
-                  
-                  <div className="db-action-buttons-group">
-                    <button className="manage-db-btn btn-csv" onClick={handleExportCSV}>
-                      <Download size={18} />
-                      <div>
-                        <h3>Export Roster CSV</h3>
-                        <p>Download summary table of student grades & points.</p>
-                      </div>
-                    </button>
-                    <button className="manage-db-btn btn-backup" onClick={downloadBackup}>
-                      <Download size={18} />
-                      <div>
-                        <h3>Download Backup JSON</h3>
-                        <p>Download backup of students, quizzes, and themes.</p>
-                      </div>
-                    </button>
-                    <button className="manage-db-btn btn-restore" onClick={() => fileInputRef.current?.click()}>
-                      <Upload size={18} />
-                      <div>
-                        <h3>Upload Restore JSON</h3>
-                        <p>Upload backup file to restore device roster data.</p>
-                      </div>
-                    </button>
-                  </div>
-                </div>
-
-              </div>
-
-              {/* Roster list editor */}
-              <div className="manage-roster-list-panel">
-                <h2>Roster Directory & Removal Tools</h2>
-                <div className="table-responsive">
-                  <table className="roster-table">
-                    <thead>
-                      <tr>
-                        <th>Joined Date</th>
-                        <th>Name</th>
-                        <th>Group</th>
-                        <th>Total Points</th>
-                        <th>Badges</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rankedStudents.map((s) => {
-                        const pts = totalPoints(s);
-                        return (
-                          <tr key={s.id}>
-                            <td>{s.joinedAt}</td>
-                            <td><strong>{s.name}</strong></td>
-                            <td>{s.group}</td>
-                            <td>{pts.earned} pts</td>
-                            <td>{(s.badges || []).length} unlocked</td>
-                            <td>
-                              <button className="btn-danger btn-mini" onClick={() => requestDeleteStudent(s.id)}>
-                                Remove Student
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      {students.length === 0 && (
-                        <tr>
-                          <td colSpan={6} className="muted text-center py-20">
-                            No students currently registered.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-        </section>
-      </div>
-
-      {/* ==========================================
-          GLOBAL PROFILE OVERLAY MODAL
-         ========================================== */}
-      {isProfileModalOpen && activeStudentProfile && (
-        <div className="modal-overlay profile-modal-overlay">
-          <div className="modal-content profile-modal-content">
-            <div className="profile-modal-header">
-              <div className="header-info">
-                <h1>{activeStudentProfile.name}</h1>
-                <span className="profile-group-tag">{activeStudentProfile.group}</span>
-              </div>
-              <button
-                className="close-profile-btn"
-                onClick={() => {
-                  setIsProfileModalOpen(false);
-                  setSelectedStudentId(null);
-                }}
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="profile-modal-grid">
-              
-              {/* Left Column: Visual display (Aquarium & Faith Tree) */}
-              <div className="profile-visuals-col">
-                
-                {/* Personal Aquarium Section */}
-                <section className="profile-widget-box aquarium-box">
-                  <div className="widget-header">
-                    <Fish size={18} />
-                    <h3>Personal Aquarium</h3>
-                    <span className="items-count-badge">
-                      {activeStudentProfile.rewards.length} items placed
-                    </span>
-                  </div>
-                  
-                  {/* Embedded Aquarium Component Container */}
-                  <div className="profile-aquarium-visual-container">
-                    <Aquarium student={activeStudentProfile} />
-                  </div>
-
-                  {/* Virtual Reward Shop redeemable by points */}
-                  <div className="virtual-reward-shop-widget">
-                    <h4>Unlock virtual rewards for aquarium:</h4>
-                    <div className="shop-buttons-grid">
-                      {rewardCatalog.map((reward) => {
-                        const owned = activeStudentProfile.rewards.includes(reward.id);
-                        const points = totalPoints(activeStudentProfile);
-                        const canBuy = points.available >= reward.cost && !owned;
-                        return (
-                          <button
-                            key={reward.id}
-                            disabled={!canBuy}
-                            onClick={() => unlockReward(activeStudentProfile.id, reward.id)}
-                            className={`shop-item-btn ${owned ? "owned" : canBuy ? "can-buy" : "locked"}`}
-                            title={owned ? "Unlocked" : `Costs ${reward.cost} pts (Available: ${points.available} pts)`}
-                          >
-                            <span className="shop-icon-type">
-                              {reward.type === "fish" ? "🐠" : "🌿"}
-                            </span>
-                            <span className="shop-name">{reward.name}</span>
-                            <span className="shop-cost-label">
-                              {owned ? "Unlocked" : `${reward.cost} pts`}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </section>
-
-                {/* Personal Faith Tree Section */}
-                <section className="profile-widget-box faith-tree-box">
-                  <div className="widget-header">
-                    <Sprout size={18} />
-                    <h3>Faith Tree</h3>
-                    <span className="items-count-badge">
-                      Level {treeLevel(totalPoints(activeStudentProfile).earned).level}
-                    </span>
-                  </div>
-                  <div className="profile-tree-visual-container">
-                    <FaithTree level={treeLevel(totalPoints(activeStudentProfile).earned)} />
-                  </div>
-                </section>
-
-              </div>
-
-              {/* Right Column: Textual display (Badges unlocked, Growth activities record) */}
-              <div className="profile-records-col">
-                
-                {/* Badges unlocked showcase */}
-                <section className="profile-widget-box badges-unlocked-showcase">
-                  <div className="widget-header">
-                    <Award size={18} />
-                    <h3>Unlocked Badges ({(activeStudentProfile.badges || []).length} / {badgeDefinitions.length})</h3>
-                  </div>
-                  
-                  <div className="modal-badges-gallery">
-                    {badgeDefinitions.map((badge) => {
-                      const isUnlocked = (activeStudentProfile.badges || []).includes(badge.id);
-                      return (
-                        <div
-                          key={badge.id}
-                          className={`modal-badge-showcase-card ${isUnlocked ? "unlocked" : "locked"}`}
-                        >
-                          <div className="badge-showcase-icon">{badge.icon}</div>
-                          <div className="badge-showcase-body">
-                            <h4>{badge.name}</h4>
-                            <p>{badge.description}</p>
-                            {!isUnlocked && (
-                              <span className="req-tooltip-label">Req: {badge.condition}</span>
-                            )}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-
-                {/* Growth Record scrollable activities list */}
-                <section className="profile-widget-box activities-growth-record">
-                  <div className="widget-header">
-                    <Activity size={18} />
-                    <h3>Activity Growth Record</h3>
-                  </div>
-                  <div className="profile-activities-scroller">
-                    {[...activeStudentProfile.activities]
-                      .sort((a, b) => b.date.localeCompare(a.date))
-                      .map((act) => (
-                        <div key={act.id} className="profile-activity-item">
-                          <div className="act-details">
-                            <span className="act-lbl">{act.label}</span>
-                            <span className="act-dt">{act.date}</span>
-                          </div>
-                          <div className="act-pts">+{act.points} pts</div>
-                        </div>
-                      ))}
-                    {activeStudentProfile.activities.length === 0 && (
-                      <p className="muted py-20 text-center">No activities recorded yet.</p>
-                    )}
-                  </div>
-                </section>
-
-              </div>
-
             </div>
           </div>
         </div>
       )}
 
-      {/* Floating Back to Top Button */}
-      <button 
-        className="floating-back-to-top"
-        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-        title="Back to Top"
-        aria-label="Back to Top"
-      >
-        <ArrowUp size={20} />
-      </button>
+      {/* ==========================================
+          VIEW 2: STUDENTS ROSTER & PROFILES
+          ========================================== */}
+      {activeView === "students" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Controls Bar */}
+          <div className="clay-card" style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", flex: 1, minWidth: "280px" }}>
+              {/* Search Box */}
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "8px",
+                  background: "var(--card-surface-alt)",
+                  border: "2px solid var(--card-border)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "8px 14px",
+                  flex: "1 0 200px"
+                }}
+              >
+                <Search size={18} color="var(--text-muted)" />
+                <input
+                  type="text"
+                  placeholder="Search students..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  style={{ border: "none", background: "none", width: "100%", outline: "none" }}
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery("")} style={{ color: "var(--text-muted)" }}>
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
 
-    </main>
-  );
-}
+              {/* Group Chips */}
+              <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                {groupsList.map((grp) => (
+                  <button
+                    key={grp}
+                    onClick={() => setSelectedGroup(grp)}
+                    className="clay-btn clay-btn-sm"
+                    style={{
+                      background: selectedGroup === grp ? "var(--primary)" : "var(--card-surface-alt)",
+                      color: selectedGroup === grp ? "var(--text-inverse)" : "var(--text-main)",
+                      border: "1px solid var(--card-border)"
+                    }}
+                  >
+                    {grp}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-// ==========================================
-// 13. INNER COMPONENT INSERTS
-// ==========================================
+            {/* Sort & Action */}
+            <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <select
+                value={studentSortBy}
+                onChange={(e) => setStudentSortBy(e.target.value as "points" | "name" | "badges")}
+                style={{
+                  padding: "8px 12px",
+                  borderRadius: "var(--radius-md)",
+                  border: "2px solid var(--card-border)",
+                  background: "var(--card-surface-alt)",
+                  fontWeight: 600
+                }}
+              >
+                <option value="points">Sort by Points</option>
+                <option value="name">Sort by Name</option>
+                <option value="badges">Sort by Badges</option>
+              </select>
 
-function Aquarium({ student }: { student: Student }) {
-  const rewards = student.rewards;
-  const fish = rewards.filter((reward) => reward.includes("fish"));
-  const hasCastle = rewards.includes("castle");
-  const hasCoral = rewards.includes("coral");
-  const hasPlant = rewards.includes("water-plant");
-  const hasRocks = rewards.includes("rocks");
+              <button
+                className="clay-btn clay-btn-primary clay-btn-sm"
+                onClick={() => setShowAddStudentModal(true)}
+              >
+                <UserPlus size={16} />
+                <span>Add Student</span>
+              </button>
+            </div>
+          </div>
 
-  const bubbleList = [
-    { left: "8%", delay: "0s", drift: "14px", size: 6 },
-    { left: "24%", delay: "1.2s", drift: "-18px", size: 9 },
-    { left: "40%", delay: "2.8s", drift: "22px", size: 5 },
-    { left: "58%", delay: "0.6s", drift: "-14px", size: 7 },
-    { left: "74%", delay: "2.0s", drift: "20px", size: 10 },
-    { left: "88%", delay: "3.5s", drift: "-10px", size: 6 }
-  ];
+          {/* Students Grid */}
+          {filteredStudents.length === 0 ? (
+            <div className="clay-card" style={{ textAlign: "center", padding: "50px 20px" }}>
+              <HelpCircle size={48} color="var(--text-muted)" style={{ margin: "0 auto 12px" }} />
+              <h3>No students found</h3>
+              <p style={{ color: "var(--text-muted)" }}>Try clearing search filters or add a new student.</p>
+            </div>
+          ) : (
+            <div className="students-grid">
+              {filteredStudents.map((s) => {
+                const pts = totalPoints(s);
+                const tree = treeLevel(pts.earned);
+                return (
+                  <div
+                    key={s.id}
+                    className="student-card clay-card-interactive"
+                    onClick={() => {
+                      setSelectedStudentId(s.id);
+                      setIsProfileModalOpen(true);
+                      playSynthSound("pop");
+                    }}
+                  >
+                    <div className="student-card-header">
+                      <div className="student-avatar-box">
+                        {s.name.slice(0, 1).toUpperCase()}
+                      </div>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="student-card-name" style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {s.name}
+                        </div>
+                        <div className="student-card-group">{s.group}</div>
+                      </div>
+                      <div style={{ fontSize: "1.4rem" }} title={tree.name}>
+                        {tree.icon}
+                      </div>
+                    </div>
 
-  return (
-    <div className="aquarium-render-box">
-      <div className="aquarium-sub-render">
-        <div className="water-glow-overlay" />
-        
-        {/* Render animated bubbles */}
-        {bubbleList.map((bubble, i) => (
-          <span
-            key={`bubble-${i}`}
-            className="bubble"
-            style={{
-              left: bubble.left,
-              animationDelay: bubble.delay,
-              width: `${bubble.size}px`,
-              height: `${bubble.size}px`,
-              // @ts-ignore
-              "--drift": bubble.drift
-            }}
-          />
-        ))}
+                    <div className="student-card-points">
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "0.74rem", textTransform: "uppercase", color: "var(--text-muted)", fontWeight: 700 }}>
+                          Faith Points
+                        </div>
+                        <div className="student-points-number">{pts.earned}</div>
+                      </div>
 
-        {fish.map((reward, index) => (
-          <span
-            className={`fish fish-${(index % 4) + 1} ${reward}`}
-            key={`${reward}-${index}`}
-            style={{ animationDelay: `${index * 0.7}s` }}
-          />
-        ))}
-        
-        {hasPlant && <span className="plant plant-left" />}
-        {hasPlant && <span className="plant plant-right" />}
-        {hasCastle && <span className="castle" />}
-        {hasCoral && <span className="coral" />}
-        {hasRocks && <span className="rocks" />}
-        <span className="sand" />
-      </div>
-    </div>
-  );
-}
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: "0.74rem", textTransform: "uppercase", color: "var(--text-muted)", fontWeight: 700 }}>
+                          Badges
+                        </div>
+                        <strong style={{ fontFamily: "Baloo 2", fontSize: "1.3rem", color: "var(--accent)" }}>
+                          {s.badges?.length || 0}
+                        </strong>
+                      </div>
+                    </div>
 
-function FaithTree({ level }: { level: ReturnType<typeof treeLevel> }) {
-  return (
-    <div className="tree-render-box">
-      <div className={`tree-stage level-${level.level}`}>
-        <div className="sun" />
-        <div className="tree">
-          <span className="trunk" />
-          <span className="leaf leaf-a" />
-          <span className="leaf leaf-b" />
-          <span className="leaf leaf-c" />
-          <span className="leaf leaf-d" />
+                    {/* Badge Chips Preview */}
+                    <div style={{ display: "flex", gap: "6px", overflow: "hidden", height: "30px", alignItems: "center" }}>
+                      {(s.badges || []).slice(0, 4).map((bId) => {
+                        const bDef = badgeDefinitions.find((b) => b.id === bId);
+                        return (
+                          <span
+                            key={bId}
+                            title={bDef?.name || bId}
+                            style={{
+                              fontSize: "1.1rem",
+                              background: "var(--card-surface-alt)",
+                              padding: "2px 6px",
+                              borderRadius: "var(--radius-sm)",
+                              border: "1px solid var(--card-border)"
+                            }}
+                          >
+                            {bDef?.icon || "🏅"}
+                          </span>
+                        );
+                      })}
+                      {(s.badges?.length || 0) > 4 && (
+                        <span style={{ fontSize: "0.78rem", color: "var(--text-muted)", fontWeight: 700 }}>
+                          +{s.badges!.length - 4}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Quick Button inside card */}
+                    <div style={{ display: "flex", gap: "8px", marginTop: "auto" }}>
+                      <button
+                        className="clay-btn clay-btn-primary clay-btn-sm"
+                        style={{ flex: 1 }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setQuickAwardStudentId(s.id);
+                          setShowQuickAward(true);
+                          playSynthSound("pop");
+                        }}
+                      >
+                        <Zap size={14} />
+                        <span>Award Points</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
-        <div className="soil" />
-      </div>
-      <div className="level-meter-wrapper">
-        <div className="meter-label-row">
-          <span>Level {level.level}: {level.name}</span>
-          <span>{level.percent}%</span>
+      )}
+
+      {/* ==========================================
+          VIEW 3: ATTENDANCE TAB
+          ========================================== */}
+      {activeView === "attendance" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div className="clay-card" style={{ display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between" }}>
+            {/* Session Type & Date */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", gap: "6px" }}>
+                <button
+                  className={`clay-btn clay-btn-sm ${attendanceSessionType === "sundaySchool" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                  onClick={() => setAttendanceSessionType("sundaySchool")}
+                >
+                  ⛪ Sunday School (+10 pts)
+                </button>
+                <button
+                  className={`clay-btn clay-btn-sm ${attendanceSessionType === "outreach" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                  onClick={() => setAttendanceSessionType("outreach")}
+                >
+                  🌍 Outreach Event (+15 pts)
+                </button>
+              </div>
+
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <CalendarDays size={18} color="var(--primary)" />
+                <input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
+                  style={{
+                    padding: "6px 12px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    background: "var(--card-surface-alt)",
+                    fontWeight: 600
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Bulk Select / Submit */}
+            <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+              <button
+                className="clay-btn clay-btn-secondary clay-btn-sm"
+                onClick={() => {
+                  setPresentStudentIds(new Set(students.map((s) => s.id)));
+                  playSynthSound("pop");
+                }}
+              >
+                Select All
+              </button>
+              <button
+                className="clay-btn clay-btn-secondary clay-btn-sm"
+                onClick={() => {
+                  setPresentStudentIds(new Set());
+                  playSynthSound("pop");
+                }}
+              >
+                Clear
+              </button>
+              <button
+                className="clay-btn clay-btn-accent clay-btn-sm"
+                onClick={() => {
+                  const ids = Array.from(presentStudentIds);
+                  if (ids.length === 0) {
+                    triggerToast("No Selection", "Please check at least one student.");
+                    return;
+                  }
+                  const pts = attendanceSessionType === "sundaySchool" ? 10 : 15;
+                  const label = attendanceSessionType === "sundaySchool" ? "Sunday School Attendance" : "Outreach Attendance";
+                  const kind = attendanceSessionType === "sundaySchool" ? "attendance" : "outreach";
+                  awardPointsToMultiple(ids, pts, label, kind);
+                  setPresentStudentIds(new Set());
+                }}
+              >
+                <CheckCircle2 size={16} />
+                <span>Save Attendance ({presentStudentIds.size})</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Student Checkbox Cards */}
+          <div className="students-grid">
+            {students.map((s) => {
+              const isPresent = presentStudentIds.has(s.id);
+              return (
+                <div
+                  key={s.id}
+                  className="student-card clay-card-interactive"
+                  style={{
+                    borderColor: isPresent ? "var(--primary)" : "var(--card-border)",
+                    background: isPresent ? "var(--primary-surface)" : "var(--card-bg)"
+                  }}
+                  onClick={() => {
+                    const next = new Set(presentStudentIds);
+                    if (next.has(s.id)) next.delete(s.id);
+                    else next.add(s.id);
+                    setPresentStudentIds(next);
+                    playSynthSound("pop");
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+                    <div
+                      style={{
+                        width: "32px",
+                        height: "32px",
+                        borderRadius: "var(--radius-sm)",
+                        border: "2px solid var(--primary)",
+                        background: isPresent ? "var(--primary)" : "var(--card-bg)",
+                        color: "var(--text-inverse)",
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center"
+                      }}
+                    >
+                      {isPresent && <Check size={20} />}
+                    </div>
+
+                    <div style={{ flex: 1 }}>
+                      <strong style={{ fontSize: "1.15rem", display: "block", fontFamily: "Baloo 2" }}>
+                        {s.name}
+                      </strong>
+                      <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>{s.group}</span>
+                    </div>
+
+                    <span style={{ fontFamily: "Baloo 2", fontWeight: 800, color: "var(--primary)" }}>
+                      {totalPoints(s).earned} pts
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
-        <div className="level-meter-track">
-          <span className="level-meter-fill" style={{ width: `${level.percent}%` }} />
+      )}
+
+      {/* ==========================================
+          VIEW 4: LIVE POINTS TAB
+          ========================================== */}
+      {activeView === "livePoints" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 0.8fr", gap: "20px" }}>
+          {/* Left Column: Student Select & Point Actions */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Step 1: Select Student(s) */}
+            <div className="clay-card">
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                <h3 style={{ fontSize: "1.3rem" }}>1. Select Student(s)</h3>
+                <div style={{ display: "flex", gap: "6px" }}>
+                  <button
+                    className="clay-btn clay-btn-secondary clay-btn-sm"
+                    onClick={() => setSelectedPointStudents(students.map((s) => s.id))}
+                  >
+                    Select All
+                  </button>
+                  <button
+                    className="clay-btn clay-btn-secondary clay-btn-sm"
+                    onClick={() => setSelectedPointStudents([])}
+                  >
+                    Deselect
+                  </button>
+                </div>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px", maxHeight: "240px", overflowY: "auto", padding: "4px" }}>
+                {students.map((s) => {
+                  const isSel = selectedPointStudents.includes(s.id);
+                  return (
+                    <button
+                      key={s.id}
+                      onClick={() => {
+                        if (isSel) {
+                          setSelectedPointStudents((prev) => prev.filter((id) => id !== s.id));
+                        } else {
+                          setSelectedPointStudents((prev) => [...prev, s.id]);
+                        }
+                        playSynthSound("pop");
+                      }}
+                      style={{
+                        padding: "10px 12px",
+                        borderRadius: "var(--radius-md)",
+                        border: `2px solid ${isSel ? "var(--primary)" : "var(--card-border)"}`,
+                        background: isSel ? "var(--primary-surface)" : "var(--card-surface-alt)",
+                        color: isSel ? "var(--primary-dark)" : "var(--text-main)",
+                        fontWeight: 700,
+                        textAlign: "center",
+                        fontFamily: "Baloo 2",
+                        fontSize: "1rem"
+                      }}
+                    >
+                      {s.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Step 2: Choose Point Presets */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.3rem", marginBottom: "12px" }}>2. Choose Point Preset</h3>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: "10px" }}>
+                {Object.entries(activityOptions).map(([key, opt]) => (
+                  <button
+                    key={key}
+                    className="clay-btn clay-btn-secondary"
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "flex-start",
+                      padding: "12px 14px",
+                      gap: "4px"
+                    }}
+                    onClick={() => {
+                      if (selectedPointStudents.length === 0) {
+                        triggerToast("Select a Student", "Please tap one or more students above.");
+                        return;
+                      }
+                      awardPointsToMultiple(selectedPointStudents, opt.points, opt.label, key as ActivityKind);
+                    }}
+                  >
+                    <span style={{ fontSize: "1.2rem", fontWeight: 800, color: "var(--primary)" }}>
+                      +{opt.points} pts
+                    </span>
+                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)", fontWeight: 600, textAlign: "left" }}>
+                      {opt.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Step 3: Custom Amount Form */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.3rem", marginBottom: "12px" }}>3. Or Custom Points</h3>
+              <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "center" }}>
+                <input
+                  type="number"
+                  value={customPointAmount}
+                  onChange={(e) => setCustomPointAmount(Number(e.target.value))}
+                  style={{
+                    width: "90px",
+                    padding: "10px 14px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontFamily: "Baloo 2",
+                    fontSize: "1.2rem",
+                    fontWeight: 800
+                  }}
+                />
+                <input
+                  type="text"
+                  placeholder="Reason (e.g. Excellent memory work, volunteered)"
+                  value={customPointReason}
+                  onChange={(e) => setCustomPointReason(e.target.value)}
+                  style={{
+                    flex: 1,
+                    minWidth: "200px",
+                    padding: "10px 14px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 600
+                  }}
+                />
+                <button
+                  className="clay-btn clay-btn-accent"
+                  onClick={() => {
+                    if (selectedPointStudents.length === 0) {
+                      triggerToast("Select a Student", "Please select at least one student.");
+                      return;
+                    }
+                    awardPointsToMultiple(selectedPointStudents, customPointAmount, customPointReason || "Custom Award", "custom");
+                  }}
+                >
+                  <Zap size={18} />
+                  <span>Award Custom</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column: Live Session Feed */}
+          <div className="clay-card" style={{ display: "flex", flexDirection: "column" }}>
+            <h3 style={{ fontSize: "1.3rem", marginBottom: "4px" }}>⚡ Live Session Activity</h3>
+            <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "12px" }}>
+              Points awarded during this active classroom session.
+            </p>
+
+            {liveSessionLog.length === 0 ? (
+              <div style={{ textAlign: "center", color: "var(--text-muted)", padding: "40px 10px", margin: "auto" }}>
+                <Zap size={36} style={{ opacity: 0.4, margin: "0 auto 8px" }} />
+                <p>No live points awarded in this session yet.</p>
+              </div>
+            ) : (
+              <div className="activity-feed-list" style={{ flex: 1, maxHeight: "560px" }}>
+                {liveSessionLog.map((log) => (
+                  <div key={log.id} className="activity-feed-item">
+                    <div>
+                      <strong style={{ display: "block", fontSize: "1rem" }}>{log.studentName}</strong>
+                      <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>{log.label}</span>
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <span style={{ fontFamily: "Baloo 2", fontWeight: 800, color: "var(--primary)", fontSize: "1.15rem" }}>
+                        +{log.points}
+                      </span>
+                      <div style={{ fontSize: "0.72rem", color: "var(--text-muted)" }}>{log.time}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* ==========================================
+          VIEW 5: QUIZ BUILDER TAB
+          ========================================== */}
+      {activeView === "quizBuilder" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "20px" }}>
+          {/* Create / Edit Quiz Form */}
+          <div className="clay-card">
+            <h3 style={{ fontSize: "1.4rem", marginBottom: "14px" }}>
+              {editingQuizId ? "✏️ Edit Quiz" : "📝 Create New Multiple-Choice Quiz"}
+            </h3>
+
+            <form onSubmit={handleSaveQuiz} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: "6px" }}>Quiz Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Parables of Jesus, The Ten Commandments"
+                  value={builderTitle}
+                  onChange={(e) => setBuilderTitle(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "10px 14px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 600
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: "6px" }}>Points per Correct Answer</label>
+                <input
+                  type="number"
+                  value={builderPoints}
+                  onChange={(e) => setBuilderPoints(Number(e.target.value))}
+                  style={{
+                    width: "120px",
+                    padding: "8px 14px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 700
+                  }}
+                />
+              </div>
+
+              {/* Questions Builder */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <label style={{ fontWeight: 700 }}>Questions ({builderQuestions.length})</label>
+                  <button
+                    type="button"
+                    className="clay-btn clay-btn-secondary clay-btn-sm"
+                    onClick={() => {
+                      setBuilderQuestions((prev) => [
+                        ...prev,
+                        { id: `q-${Date.now()}-${prev.length}`, question: "", options: ["", "", "", ""], correctIndex: 0 }
+                      ]);
+                      playSynthSound("pop");
+                    }}
+                  >
+                    <Plus size={14} />
+                    <span>Add Question</span>
+                  </button>
+                </div>
+
+                {builderQuestions.map((q, qIndex) => (
+                  <div
+                    key={q.id}
+                    style={{
+                      background: "var(--card-surface-alt)",
+                      border: "2px solid var(--card-border)",
+                      borderRadius: "var(--radius-md)",
+                      padding: "14px",
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: "10px"
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <strong style={{ fontFamily: "Baloo 2", fontSize: "1.1rem" }}>Question #{qIndex + 1}</strong>
+                      {builderQuestions.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setBuilderQuestions((prev) => prev.filter((_, i) => i !== qIndex))}
+                          style={{ color: "var(--danger)" }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Enter question text..."
+                      value={q.question}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setBuilderQuestions((prev) =>
+                          prev.map((item, i) => (i === qIndex ? { ...item, question: val } : item))
+                        );
+                      }}
+                      required
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "var(--radius-sm)",
+                        border: "1px solid var(--card-border)",
+                        fontWeight: 600
+                      }}
+                    />
+
+                    {/* Options A, B, C, D */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                      {["A", "B", "C", "D"].map((letter, optIndex) => (
+                        <div
+                          key={letter}
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            background: q.correctIndex === optIndex ? "var(--primary-surface)" : "var(--card-bg)",
+                            padding: "6px 10px",
+                            borderRadius: "var(--radius-sm)",
+                            border: `1px solid ${q.correctIndex === optIndex ? "var(--primary)" : "var(--card-border)"}`
+                          }}
+                        >
+                          <input
+                            type="radio"
+                            name={`correct-${q.id}`}
+                            checked={q.correctIndex === optIndex}
+                            onChange={() => {
+                              setBuilderQuestions((prev) =>
+                                prev.map((item, i) => (i === qIndex ? { ...item, correctIndex: optIndex } : item))
+                              );
+                            }}
+                          />
+                          <span style={{ fontWeight: 800, fontSize: "0.85rem" }}>{letter}:</span>
+                          <input
+                            type="text"
+                            placeholder={`Option ${letter}`}
+                            value={q.options[optIndex] || ""}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setBuilderQuestions((prev) =>
+                                prev.map((item, i) => {
+                                  if (i !== qIndex) return item;
+                                  const opts = [...item.options];
+                                  opts[optIndex] = val;
+                                  return { ...item, options: opts };
+                                })
+                              );
+                            }}
+                            required
+                            style={{
+                              border: "none",
+                              background: "none",
+                              width: "100%",
+                              outline: "none",
+                              fontSize: "0.9rem"
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div style={{ display: "flex", gap: "10px", marginTop: "10px" }}>
+                <button type="submit" className="clay-btn clay-btn-primary" style={{ flex: 1 }}>
+                  <Check size={18} />
+                  <span>{editingQuizId ? "Save Changes" : "Save Quiz to Library"}</span>
+                </button>
+                {editingQuizId && (
+                  <button
+                    type="button"
+                    className="clay-btn clay-btn-secondary"
+                    onClick={() => {
+                      setEditingQuizId(null);
+                      setBuilderTitle("");
+                      setBuilderQuestions([{ id: `q-${Date.now()}-0`, question: "", options: ["", "", "", ""], correctIndex: 0 }]);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          {/* Saved Quizzes Library */}
+          <div className="clay-card">
+            <h3 style={{ fontSize: "1.4rem", marginBottom: "14px" }}>📚 Quiz Library ({quizzes.length})</h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+              {quizzes.map((quiz) => (
+                <div
+                  key={quiz.id}
+                  style={{
+                    background: "var(--card-surface-alt)",
+                    border: "2px solid var(--card-border)",
+                    borderRadius: "var(--radius-lg)",
+                    padding: "16px",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: "10px"
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div>
+                      <strong style={{ fontFamily: "Baloo 2", fontSize: "1.2rem", display: "block" }}>
+                        {quiz.title}
+                      </strong>
+                      <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                        {quiz.questions.length} questions • {quiz.pointsPerCorrect} pts each
+                      </span>
+                    </div>
+
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <button
+                        className="clay-btn clay-btn-secondary clay-btn-sm"
+                        onClick={() => {
+                          setEditingQuizId(quiz.id);
+                          setBuilderTitle(quiz.title);
+                          setBuilderPoints(quiz.pointsPerCorrect);
+                          setBuilderQuestions(quiz.questions);
+                        }}
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        className="clay-btn clay-btn-danger clay-btn-sm"
+                        onClick={() => {
+                          setQuizzes((prev) => prev.filter((q) => q.id !== quiz.id));
+                          triggerToast("Quiz Deleted", `Removed "${quiz.title}"`);
+                        }}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <button
+                    className="clay-btn clay-btn-accent clay-btn-sm"
+                    onClick={() => {
+                      setActiveQuiz(quiz);
+                      setQuizQuestionIndex(0);
+                      setQuizStage("question");
+                      setQuizAwardedStudents(new Set());
+                      setActiveView("runQuiz");
+                      playSynthSound("fanfare");
+                    }}
+                  >
+                    <Play size={16} />
+                    <span>Launch in Run Quiz Mode</span>
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          VIEW 6: RUN QUIZ (PROJECTOR MODE)
+          ========================================== */}
+      {activeView === "runQuiz" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {!activeQuiz ? (
+            <div className="clay-card" style={{ textAlign: "center", padding: "40px" }}>
+              <BookOpen size={48} color="var(--primary)" style={{ margin: "0 auto 12px" }} />
+              <h2>Select a Quiz to Launch</h2>
+              <p style={{ color: "var(--text-muted)", marginBottom: "18px" }}>
+                Choose any pre-built quiz from the library to run live on the classroom projector.
+              </p>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "center", flexWrap: "wrap" }}>
+                {quizzes.map((q) => (
+                  <button
+                    key={q.id}
+                    className="clay-btn clay-btn-primary"
+                    onClick={() => {
+                      setActiveQuiz(q);
+                      setQuizQuestionIndex(0);
+                      setQuizStage("question");
+                      setQuizAwardedStudents(new Set());
+                      playSynthSound("fanfare");
+                    }}
+                  >
+                    <Play size={16} />
+                    <span>{q.title} ({q.questions.length}Q)</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="projector-quiz-stage">
+              {/* Top Controls */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "10px" }}>
+                <div>
+                  <span style={{ fontSize: "0.9rem", color: "var(--accent-light)", fontWeight: 700, textTransform: "uppercase" }}>
+                    {activeQuiz.title}
+                  </span>
+                  <h3 style={{ margin: 0, color: "var(--text-inverse)" }}>
+                    Question {quizQuestionIndex + 1} of {activeQuiz.questions.length}
+                  </h3>
+                </div>
+
+                <div style={{ display: "flex", gap: "8px" }}>
+                  <button
+                    className="control-btn"
+                    onClick={() => setActiveQuiz(null)}
+                  >
+                    Change Quiz
+                  </button>
+                </div>
+              </div>
+
+              {/* Current Question */}
+              {activeQuiz.questions[quizQuestionIndex] && (
+                <>
+                  <div className="projector-question-card">
+                    <h2>{activeQuiz.questions[quizQuestionIndex].question}</h2>
+                  </div>
+
+                  {/* Options Grid */}
+                  <div className="projector-options-grid">
+                    {activeQuiz.questions[quizQuestionIndex].options.map((opt, idx) => {
+                      const isCorrect = idx === activeQuiz.questions[quizQuestionIndex].correctIndex;
+                      const showAnswer = quizStage === "reveal" || quizStage === "award";
+                      const letter = ["A", "B", "C", "D"][idx] || String(idx + 1);
+
+                      return (
+                        <div
+                          key={idx}
+                          className={`projector-option-card ${showAnswer && isCorrect ? "projector-option-correct" : ""}`}
+                        >
+                          <div className="projector-option-letter">{letter}</div>
+                          <span>{opt}</span>
+                          {showAnswer && isCorrect && (
+                            <CheckCircle2 size={28} color="var(--success)" style={{ marginLeft: "auto" }} />
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Stage Action Controls */}
+                  <div style={{ display: "flex", justifyContent: "center", gap: "14px", marginTop: "10px", flexWrap: "wrap" }}>
+                    {quizStage === "question" && (
+                      <button
+                        className="clay-btn clay-btn-accent clay-btn-lg"
+                        onClick={() => {
+                          setQuizStage("options");
+                          playSynthSound("pop");
+                        }}
+                      >
+                        Show Options (A, B, C, D)
+                      </button>
+                    )}
+
+                    {quizStage === "options" && (
+                      <button
+                        className="clay-btn clay-btn-primary clay-btn-lg"
+                        onClick={() => {
+                          setQuizStage("reveal");
+                          playSynthSound("success");
+                        }}
+                      >
+                        🎉 Reveal Correct Answer
+                      </button>
+                    )}
+
+                    {quizStage === "reveal" && (
+                      <button
+                        className="clay-btn clay-btn-accent clay-btn-lg"
+                        onClick={() => {
+                          setQuizStage("award");
+                          playSynthSound("pop");
+                        }}
+                      >
+                        ⚡ Tap Who Answered Correctly
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Award Points Selector */}
+                  {quizStage === "award" && (
+                    <div
+                      style={{
+                        background: "rgba(255, 255, 255, 0.12)",
+                        border: "2px solid rgba(255, 255, 255, 0.2)",
+                        borderRadius: "var(--radius-lg)",
+                        padding: "16px",
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: "12px"
+                      }}
+                    >
+                      <strong style={{ fontSize: "1.15rem", color: "var(--text-inverse)", textAlign: "center" }}>
+                        Tap students who got it right to award +{activeQuiz.pointsPerCorrect} points:
+                      </strong>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px" }}>
+                        {students.map((s) => {
+                          const isAwarded = quizAwardedStudents.has(s.id);
+                          return (
+                            <button
+                              key={s.id}
+                              onClick={() => {
+                                const next = new Set(quizAwardedStudents);
+                                if (next.has(s.id)) {
+                                  next.delete(s.id);
+                                } else {
+                                  next.add(s.id);
+                                  awardPointsToStudent(
+                                    s.id,
+                                    activeQuiz.pointsPerCorrect,
+                                    `Quiz Correct: "${activeQuiz.questions[quizQuestionIndex].question}"`,
+                                    "quiz"
+                                  );
+                                }
+                                setQuizAwardedStudents(next);
+                              }}
+                              style={{
+                                padding: "10px",
+                                borderRadius: "var(--radius-md)",
+                                background: isAwarded ? "var(--success)" : "rgba(255, 255, 255, 0.18)",
+                                color: "var(--text-inverse)",
+                                border: `2px solid ${isAwarded ? "var(--secondary-light)" : "rgba(255, 255, 255, 0.3)"}`,
+                                fontWeight: 800,
+                                fontFamily: "Baloo 2",
+                                fontSize: "1.05rem"
+                              }}
+                            >
+                              {s.name} {isAwarded ? "✓" : ""}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Next / Finish Navigation */}
+                      <div style={{ display: "flex", justifyContent: "space-between", marginTop: "10px" }}>
+                        <button
+                          className="clay-btn clay-btn-secondary"
+                          onClick={() => {
+                            if (quizQuestionIndex > 0) {
+                              setQuizQuestionIndex(quizQuestionIndex - 1);
+                              setQuizStage("question");
+                              setQuizAwardedStudents(new Set());
+                            }
+                          }}
+                          disabled={quizQuestionIndex === 0}
+                        >
+                          Previous Question
+                        </button>
+
+                        {quizQuestionIndex < activeQuiz.questions.length - 1 ? (
+                          <button
+                            className="clay-btn clay-btn-primary clay-btn-lg"
+                            onClick={() => {
+                              setQuizQuestionIndex(quizQuestionIndex + 1);
+                              setQuizStage("question");
+                              setQuizAwardedStudents(new Set());
+                              playSynthSound("sparkles");
+                            }}
+                          >
+                            Next Question →
+                          </button>
+                        ) : (
+                          <button
+                            className="clay-btn clay-btn-accent clay-btn-lg"
+                            onClick={() => {
+                              playSynthSound("fanfare");
+                              triggerToast("Quiz Completed!", `Great job everyone on ${activeQuiz.title}!`);
+                              setActiveView("leaderboard");
+                            }}
+                          >
+                            Finish Quiz & View Leaderboard 🏆
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ==========================================
+          VIEW 7: LEADERBOARD TAB
+          ========================================== */}
+      {activeView === "leaderboard" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+          {/* Top 3 Podium */}
+          {rankedStudents.length >= 3 && (
+            <div className="clay-card" style={{ background: "linear-gradient(180deg, var(--card-bg) 0%, var(--card-surface-alt) 100%)" }}>
+              <h3 style={{ textAlign: "center", fontSize: "1.4rem", marginBottom: "4px" }}>
+                🏆 Top Faith Champions
+              </h3>
+
+              <div className="podium-container">
+                {/* 2nd Place */}
+                <div className="podium-step">
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ fontSize: "1.8rem" }}>🥈</div>
+                    <strong style={{ fontFamily: "Baloo 2", fontSize: "1.2rem", display: "block" }}>
+                      {rankedStudents[1].name}
+                    </strong>
+                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                      {totalPoints(rankedStudents[1]).earned} pts
+                    </span>
+                  </div>
+                  <div className="podium-pillar podium-2">#2</div>
+                </div>
+
+                {/* 1st Place */}
+                <div className="podium-step">
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ fontSize: "2.4rem", animation: "float 2s infinite ease-in-out" }}>👑</div>
+                    <strong style={{ fontFamily: "Baloo 2", fontSize: "1.4rem", color: "var(--accent-dark)", display: "block" }}>
+                      {rankedStudents[0].name}
+                    </strong>
+                    <span style={{ fontSize: "0.95rem", fontWeight: 800, color: "var(--primary)" }}>
+                      {totalPoints(rankedStudents[0]).earned} pts
+                    </span>
+                  </div>
+                  <div className="podium-pillar podium-1">#1</div>
+                </div>
+
+                {/* 3rd Place */}
+                <div className="podium-step">
+                  <div style={{ marginBottom: "8px" }}>
+                    <div style={{ fontSize: "1.8rem" }}>🥉</div>
+                    <strong style={{ fontFamily: "Baloo 2", fontSize: "1.2rem", display: "block" }}>
+                      {rankedStudents[2].name}
+                    </strong>
+                    <span style={{ fontSize: "0.85rem", color: "var(--text-muted)" }}>
+                      {totalPoints(rankedStudents[2]).earned} pts
+                    </span>
+                  </div>
+                  <div className="podium-pillar podium-3">#3</div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Full Rankings Table */}
+          <div className="clay-card">
+            <h3 style={{ fontSize: "1.3rem", marginBottom: "14px" }}>📋 Complete Class Standings</h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+              {rankedStudents.map((s, rankIndex) => {
+                const pts = totalPoints(s);
+                const tree = treeLevel(pts.earned);
+                return (
+                  <div
+                    key={s.id}
+                    className="activity-feed-item clay-card-interactive"
+                    onClick={() => {
+                      setSelectedStudentId(s.id);
+                      setIsProfileModalOpen(true);
+                      playSynthSound("pop");
+                    }}
+                    style={{
+                      padding: "14px 18px",
+                      borderLeft: `5px solid ${
+                        rankIndex === 0
+                          ? "var(--accent)"
+                          : rankIndex === 1
+                          ? "#94a3b8"
+                          : rankIndex === 2
+                          ? "var(--accent-dark)"
+                          : "var(--card-border)"
+                      }`
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div
+                        style={{
+                          width: "36px",
+                          fontFamily: "Baloo 2",
+                          fontSize: "1.3rem",
+                          fontWeight: 800,
+                          textAlign: "center",
+                          color: rankIndex < 3 ? "var(--primary)" : "var(--text-muted)"
+                        }}
+                      >
+                        #{rankIndex + 1}
+                      </div>
+
+                      <div
+                        style={{
+                          width: "44px",
+                          height: "44px",
+                          borderRadius: "var(--radius-md)",
+                          background: "var(--primary-surface)",
+                          color: "var(--primary)",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontFamily: "Baloo 2",
+                          fontSize: "1.3rem",
+                          fontWeight: 800
+                        }}
+                      >
+                        {s.name.slice(0, 1)}
+                      </div>
+
+                      <div>
+                        <strong style={{ fontFamily: "Baloo 2", fontSize: "1.2rem", display: "block" }}>
+                          {s.name}
+                        </strong>
+                        <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                          {s.group} • {tree.name} ({tree.icon})
+                        </span>
+                      </div>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ fontFamily: "Baloo 2", fontWeight: 800, fontSize: "1.4rem", color: "var(--primary)" }}>
+                          {pts.earned}
+                        </span>
+                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)" }}>
+                          {s.badges?.length || 0} badges
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          VIEW 8: MANAGE TAB
+          ========================================== */}
+      {activeView === "manage" && (
+        <div style={{ display: "grid", gridTemplateColumns: "1.1fr 0.9fr", gap: "20px" }}>
+          {/* Left: Student Management */}
+          <div className="clay-card">
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "1.3rem" }}>👥 Student Roster Management</h3>
+              <button
+                className="clay-btn clay-btn-primary clay-btn-sm"
+                onClick={() => setShowAddStudentModal(true)}
+              >
+                <UserPlus size={16} />
+                <span>Add Student</span>
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "480px", overflowY: "auto" }}>
+              {students.map((s) => (
+                <div
+                  key={s.id}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    padding: "12px 16px",
+                    background: "var(--card-surface-alt)",
+                    borderRadius: "var(--radius-md)",
+                    border: "1px solid var(--card-border)"
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontFamily: "Baloo 2", fontSize: "1.1rem", display: "block" }}>{s.name}</strong>
+                    <span style={{ fontSize: "0.82rem", color: "var(--text-muted)" }}>
+                      {s.group} • {totalPoints(s).earned} pts
+                    </span>
+                  </div>
+
+                  <div style={{ display: "flex", gap: "8px" }}>
+                    <button
+                      className="clay-btn clay-btn-secondary clay-btn-sm"
+                      onClick={() => {
+                        setSelectedStudentId(s.id);
+                        setIsProfileModalOpen(true);
+                        playSynthSound("pop");
+                      }}
+                    >
+                      Profile
+                    </button>
+                    <button
+                      className="clay-btn clay-btn-danger clay-btn-sm"
+                      onClick={() => {
+                        setPendingDeleteStudentId(s.id);
+                      }}
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: Data Export / Backup & Synth Tester */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            {/* Backup & CSV Export */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.3rem", marginBottom: "6px" }}>💾 Data Backup & Reports</h3>
+              <p style={{ color: "var(--text-muted)", fontSize: "0.88rem", marginBottom: "14px" }}>
+                Keep your classroom points, student badges, and quizzes safe.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                <button className="clay-btn clay-btn-primary" onClick={handleExportCSV}>
+                  <Download size={16} />
+                  <span>Export Student Roster (CSV)</span>
+                </button>
+
+                <button className="clay-btn clay-btn-secondary" onClick={handleExportJSON}>
+                  <Download size={16} />
+                  <span>Download Full JSON Backup</span>
+                </button>
+
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleImportJSON}
+                  accept=".json"
+                  style={{ display: "none" }}
+                />
+
+                <button
+                  className="clay-btn clay-btn-secondary"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={16} />
+                  <span>Restore from JSON Backup</span>
+                </button>
+
+                <button
+                  className="clay-btn clay-btn-danger clay-btn-sm"
+                  style={{ marginTop: "10px" }}
+                  onClick={() => {
+                    if (window.confirm("Reset dataset back to starter demo students and quizzes?")) {
+                      setStudents(starterStudents);
+                      setQuizzes(starterQuizzes);
+                      playSynthSound("splash");
+                      triggerToast("Dataset Reset", "Restored starter demo students & quizzes.");
+                    }
+                  }}
+                >
+                  <RefreshCw size={14} />
+                  <span>Reset to Starter Demo Data</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Audio Synthesis Test Pad */}
+            <div className="clay-card">
+              <h3 style={{ fontSize: "1.2rem", marginBottom: "10px" }}>🎵 Audio Synthesizer Test</h3>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                <button className="clay-btn clay-btn-secondary clay-btn-sm" onClick={() => playSynthSound("sparkles")}>
+                  ✨ Sparkles
+                </button>
+                <button className="clay-btn clay-btn-secondary clay-btn-sm" onClick={() => playSynthSound("fanfare")}>
+                  🎺 Victory Fanfare
+                </button>
+                <button className="clay-btn clay-btn-secondary clay-btn-sm" onClick={() => playSynthSound("splash")}>
+                  💧 Water Splash
+                </button>
+                <button className="clay-btn clay-btn-secondary clay-btn-sm" onClick={() => playSynthSound("pop")}>
+                  🫧 Bubble Pop
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 1: STUDENT FULL PROFILE & AQUARIUM
+          ========================================== */}
+      {isProfileModalOpen && selectedStudent && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="student-profile-title"
+          onClick={() => setIsProfileModalOpen(false)}
+        >
+          <div
+            className="modal-dialog modal-dialog-large"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+                <div className="student-avatar-box">
+                  {selectedStudent.name.slice(0, 1).toUpperCase()}
+                </div>
+                <div>
+                  <h2 id="student-profile-title" style={{ margin: 0 }}>
+                    {selectedStudent.name}
+                  </h2>
+                  <span style={{ color: "var(--text-muted)", fontSize: "0.9rem" }}>
+                    {selectedStudent.group} • Joined {formatCalendarDate(selectedStudent.joinedAt)}
+                  </span>
+                </div>
+              </div>
+
+              <button className="modal-close-btn" aria-label="Close modal" onClick={() => setIsProfileModalOpen(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Navigation Tabs */}
+            <div style={{ display: "flex", gap: "8px", borderBottom: "2px solid var(--card-border)", paddingBottom: "8px", marginBottom: "18px" }}>
+              <button
+                className={`clay-btn clay-btn-sm ${activeProfileTab === "aquarium" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                onClick={() => {
+                  setActiveProfileTab("aquarium");
+                  playSynthSound("splash");
+                }}
+              >
+                <Fish size={16} />
+                <span>Aquarium</span>
+              </button>
+
+              <button
+                className={`clay-btn clay-btn-sm ${activeProfileTab === "tree" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                onClick={() => {
+                  setActiveProfileTab("tree");
+                  playSynthSound("sparkles");
+                }}
+              >
+                <Sprout size={16} />
+                <span>Faith Tree</span>
+              </button>
+
+              <button
+                className={`clay-btn clay-btn-sm ${activeProfileTab === "badges" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                onClick={() => {
+                  setActiveProfileTab("badges");
+                  playSynthSound("pop");
+                }}
+              >
+                <Award size={16} />
+                <span>Badges ({selectedStudent.badges?.length || 0})</span>
+              </button>
+
+              <button
+                className={`clay-btn clay-btn-sm ${activeProfileTab === "history" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                onClick={() => {
+                  setActiveProfileTab("history");
+                  playSynthSound("pop");
+                }}
+              >
+                <Activity size={16} />
+                <span>Activity Log</span>
+              </button>
+            </div>
+
+            {/* TAB CONTENT: AQUARIUM */}
+            {activeProfileTab === "aquarium" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                <div className="aquarium-viewport">
+                  {/* Floating Bubbles */}
+                  <div className="floating-bubble" style={{ left: "20%", animationDelay: "0s" }} />
+                  <div className="floating-bubble" style={{ left: "55%", animationDelay: "1.5s" }} />
+                  <div className="floating-bubble" style={{ left: "80%", animationDelay: "2.8s" }} />
+
+                  {/* Swimming Fish items based on student rewards */}
+                  {(selectedStudent.rewards || ["small-fish"]).map((rId, i) => {
+                    const rDef = rewardCatalog.find((x) => x.id === rId);
+                    if (rDef?.type === "fish") {
+                      return (
+                        <div
+                          key={rId + i}
+                          className="swimming-fish"
+                          style={{
+                            top: `${30 + (i * 45) % 150}px`,
+                            left: `${15 + (i * 30) % 70}%`,
+                            animationDuration: `${5 + (i % 3) * 2}s`
+                          }}
+                        >
+                          <span style={{ fontSize: "2rem" }}>
+                            {rId === "golden-fish" ? "🐠" : rId === "rare-fish" ? "🐡" : "🐟"}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })}
+
+                  {/* Aquarium Sand & Decor */}
+                  <div className="aquarium-sand">
+                    <div style={{ display: "flex", justifyContent: "space-around", padding: "4px 20px" }}>
+                      {(selectedStudent.rewards || []).map((rId, i) => {
+                        const rDef = rewardCatalog.find((x) => x.id === rId);
+                        if (rDef?.type === "decor") {
+                          return (
+                            <span key={rId + i} style={{ fontSize: "1.6rem" }}>
+                              {rId === "castle" ? "🏰" : rId === "coral" ? "🪸" : rId === "water-plant" ? "🌿" : "🪨"}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "var(--card-surface-alt)", padding: "10px 14px", borderRadius: "var(--radius-md)" }}>
+                  <span style={{ fontWeight: 600, fontSize: "0.9rem" }}>
+                    Collected Aquarium Items: {selectedStudent.rewards?.length || 0}
+                  </span>
+                  <strong style={{ fontFamily: "Baloo 2", color: "var(--primary)" }}>
+                    {totalPoints(selectedStudent).available} pts available to spend
+                  </strong>
+                </div>
+              </div>
+            )}
+
+            {/* TAB CONTENT: FAITH TREE */}
+            {activeProfileTab === "tree" && (
+              <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+                {(() => {
+                  const pts = totalPoints(selectedStudent).earned;
+                  const tree = treeLevel(pts);
+                  return (
+                    <div className="tree-visualizer">
+                      <div style={{ fontSize: "5rem", marginBottom: "8px" }}>{tree.icon}</div>
+                      <h3 style={{ fontSize: "1.8rem", color: "var(--primary-dark)", margin: "0 0 4px" }}>
+                        {tree.name} (Level {tree.level})
+                      </h3>
+                      <p style={{ color: "var(--text-muted)", margin: "0 0 16px", fontWeight: 600 }}>
+                        Current Stage: {tree.stage}
+                      </p>
+
+                      <div style={{ width: "100%", maxWidth: "420px" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.88rem", marginBottom: "4px" }}>
+                          <strong>Growth Progress</strong>
+                          <span>{pts} / {tree.nextAt} Faith Points</span>
+                        </div>
+                        <div
+                          style={{
+                            height: "14px",
+                            borderRadius: "var(--radius-full)",
+                            background: "rgba(16, 185, 129, 0.2)",
+                            overflow: "hidden",
+                            border: "1px solid var(--success)"
+                          }}
+                        >
+                          <div
+                            style={{
+                              height: "100%",
+                              width: `${tree.percent}%`,
+                              background: "linear-gradient(90deg, var(--success), var(--primary))",
+                              borderRadius: "var(--radius-full)"
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
+            {/* TAB CONTENT: BADGES */}
+            {activeProfileTab === "badges" && (
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "10px", maxHeight: "420px", overflowY: "auto" }}>
+                {badgeDefinitions.map((badge) => {
+                  const isUnlocked = selectedStudent.badges?.includes(badge.id);
+                  return (
+                    <div
+                      key={badge.id}
+                      style={{
+                        padding: "12px",
+                        borderRadius: "var(--radius-md)",
+                        border: `2px solid ${isUnlocked ? "var(--primary)" : "var(--card-border)"}`,
+                        background: isUnlocked ? "var(--primary-surface)" : "var(--card-surface-alt)",
+                        opacity: isUnlocked ? 1 : 0.6,
+                        display: "flex",
+                        gap: "10px",
+                        alignItems: "center"
+                      }}
+                    >
+                      <span style={{ fontSize: "1.8rem" }}>{badge.icon}</span>
+                      <div>
+                        <strong style={{ display: "block", fontSize: "0.95rem", fontFamily: "Baloo 2" }}>
+                          {badge.name}
+                        </strong>
+                        <span style={{ fontSize: "0.76rem", color: "var(--text-muted)", display: "block" }}>
+                          {badge.condition}
+                        </span>
+                        <span
+                          style={{
+                            fontSize: "0.72rem",
+                            fontWeight: 800,
+                            color: isUnlocked ? "var(--primary)" : "var(--text-muted)"
+                          }}
+                        >
+                          {isUnlocked ? "✓ UNLOCKED" : "🔒 LOCKED"}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* TAB CONTENT: HISTORY */}
+            {activeProfileTab === "history" && (
+              <div className="activity-feed-list" style={{ maxHeight: "420px" }}>
+                {(selectedStudent.activities || []).map((act) => (
+                  <div key={act.id} className="activity-feed-item">
+                    <div>
+                      <strong style={{ display: "block", fontSize: "0.95rem" }}>{act.label}</strong>
+                      <span style={{ fontSize: "0.8rem", color: "var(--text-muted)" }}>
+                        {formatCalendarDate(act.date)}
+                      </span>
+                    </div>
+                    <span style={{ fontFamily: "Baloo 2", fontWeight: 800, color: "var(--primary)", fontSize: "1.1rem" }}>
+                      +{act.points} pts
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 2: QUICK ATTENDANCE POPUP
+          ========================================== */}
+      {showQuickAttendance && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quick-attendance-title"
+          onClick={() => setShowQuickAttendance(false)}
+        >
+          <div
+            className="modal-dialog"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 id="quick-attendance-title">✅ Quick Attendance Check</h2>
+              <button className="modal-close-btn" aria-label="Close modal" onClick={() => setShowQuickAttendance(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", gap: "8px", marginBottom: "14px" }}>
+              <button
+                className={`clay-btn clay-btn-sm ${attendanceSessionType === "sundaySchool" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                onClick={() => setAttendanceSessionType("sundaySchool")}
+              >
+                Sunday School (+10 pts)
+              </button>
+              <button
+                className={`clay-btn clay-btn-sm ${attendanceSessionType === "outreach" ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                onClick={() => setAttendanceSessionType("outreach")}
+              >
+                Outreach (+15 pts)
+              </button>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(130px, 1fr))", gap: "8px", maxHeight: "280px", overflowY: "auto", marginBottom: "16px" }}>
+              {students.map((s) => {
+                const isSel = presentStudentIds.has(s.id);
+                return (
+                  <button
+                    key={s.id}
+                    onClick={() => {
+                      const next = new Set(presentStudentIds);
+                      if (next.has(s.id)) next.delete(s.id);
+                      else next.add(s.id);
+                      setPresentStudentIds(next);
+                      playSynthSound("pop");
+                    }}
+                    style={{
+                      padding: "10px",
+                      borderRadius: "var(--radius-md)",
+                      border: `2px solid ${isSel ? "var(--primary)" : "var(--card-border)"}`,
+                      background: isSel ? "var(--primary-surface)" : "var(--card-surface-alt)",
+                      fontWeight: 700,
+                      fontFamily: "Baloo 2"
+                    }}
+                  >
+                    {s.name} {isSel ? "✓" : ""}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                className="clay-btn clay-btn-accent"
+                style={{ flex: 1 }}
+                onClick={() => {
+                  const ids = Array.from(presentStudentIds);
+                  if (ids.length === 0) {
+                    triggerToast("No Selection", "Please tap at least one student.");
+                    return;
+                  }
+                  const pts = attendanceSessionType === "sundaySchool" ? 10 : 15;
+                  const label = attendanceSessionType === "sundaySchool" ? "Sunday School Attendance" : "Outreach Attendance";
+                  const kind = attendanceSessionType === "sundaySchool" ? "attendance" : "outreach";
+                  awardPointsToMultiple(ids, pts, label, kind);
+                  setPresentStudentIds(new Set());
+                  setShowQuickAttendance(false);
+                }}
+              >
+                Submit Attendance ({presentStudentIds.size})
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 3: QUICK AWARD POPUP
+          ========================================== */}
+      {showQuickAward && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="quick-award-title"
+          onClick={() => setShowQuickAward(false)}
+        >
+          <div
+            className="modal-dialog"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 id="quick-award-title">⚡ Quick Point Award</h2>
+              <button className="modal-close-btn" aria-label="Close modal" onClick={() => setShowQuickAward(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: "6px" }}>Select Student</label>
+                <select
+                  value={quickAwardStudentId}
+                  onChange={(e) => setQuickAwardStudentId(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 700
+                  }}
+                >
+                  <option value="">-- Choose a Student --</option>
+                  {students.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.group}) - {totalPoints(s).earned} pts
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+                {[5, 10, 15, 20].map((amt) => (
+                  <button
+                    key={amt}
+                    className={`clay-btn clay-btn-sm ${quickAwardAmount === amt ? "clay-btn-primary" : "clay-btn-secondary"}`}
+                    onClick={() => setQuickAwardAmount(amt)}
+                  >
+                    +{amt} pts
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: "6px" }}>Award Reason</label>
+                <input
+                  type="text"
+                  value={quickAwardLabel}
+                  onChange={(e) => setQuickAwardLabel(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 600
+                  }}
+                />
+              </div>
+
+              <button
+                className="clay-btn clay-btn-accent"
+                onClick={() => {
+                  if (!quickAwardStudentId) {
+                    triggerToast("Select Student", "Please pick a student to award.");
+                    return;
+                  }
+                  awardPointsToStudent(quickAwardStudentId, quickAwardAmount, quickAwardLabel || "Quick Award");
+                  setShowQuickAward(false);
+                }}
+              >
+                Award +{quickAwardAmount} Points Now
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 4: ADD STUDENT MODAL
+          ========================================== */}
+      {showAddStudentModal && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="add-student-title"
+          onClick={() => setShowAddStudentModal(false)}
+        >
+          <div
+            className="modal-dialog"
+            role="document"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 id="add-student-title">➕ Enroll New Student</h2>
+              <button className="modal-close-btn" aria-label="Close modal" onClick={() => setShowAddStudentModal(false)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddStudent} style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+              <div>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: "6px" }}>Full Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Sarah, Caleb, Daniel"
+                  value={newStudentName}
+                  onChange={(e) => setNewStudentName(e.target.value)}
+                  required
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 600
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ display: "block", fontWeight: 700, marginBottom: "6px" }}>Group / Class</label>
+                <select
+                  value={newStudentGroup}
+                  onChange={(e) => setNewStudentGroup(e.target.value)}
+                  style={{
+                    width: "100%",
+                    padding: "10px",
+                    borderRadius: "var(--radius-md)",
+                    border: "2px solid var(--card-border)",
+                    fontWeight: 700
+                  }}
+                >
+                  <option value="Sunday School">Sunday School</option>
+                  <option value="Outreach Kids">Outreach Kids</option>
+                  <option value="Youth Bible Class">Youth Bible Class</option>
+                </select>
+              </div>
+
+              <button type="submit" className="clay-btn clay-btn-primary">
+                Enroll Student
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          MODAL 5: DELETE CONFIRMATION MODAL
+          ========================================== */}
+      {pendingDeleteStudentId && (
+        <div
+          className="modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="delete-confirm-title"
+          onClick={() => setPendingDeleteStudentId(null)}
+        >
+          <div
+            className="modal-dialog"
+            role="document"
+            style={{ maxWidth: "440px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-header">
+              <h2 id="delete-confirm-title" style={{ color: "var(--danger)" }}>⚠️ Confirm Removal</h2>
+              <button className="modal-close-btn" aria-label="Close modal" onClick={() => setPendingDeleteStudentId(null)}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <p style={{ color: "var(--text-muted)", marginBottom: "16px" }}>
+              Are you sure you want to delete this student and their entire points history?
+            </p>
+
+            <div style={{ display: "flex", gap: "10px" }}>
+              <button
+                className="clay-btn clay-btn-secondary"
+                style={{ flex: 1 }}
+                onClick={() => setPendingDeleteStudentId(null)}
+              >
+                Cancel
+              </button>
+              <button
+                className="clay-btn clay-btn-danger"
+                style={{ flex: 1 }}
+                onClick={() => handleDeleteStudent(pendingDeleteStudentId)}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==========================================
+          FLOATING CELEBRATION TOAST
+          ========================================== */}
+      {flashMessage && (
+        <div className="floating-toast">
+          <Sparkles size={22} color="var(--primary)" />
+          <div>
+            <strong>{flashMessage.title}</strong>
+            {flashMessage.desc && <div style={{ fontSize: "0.85rem", opacity: 0.85 }}>{flashMessage.desc}</div>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

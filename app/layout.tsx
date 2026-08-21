@@ -2,13 +2,18 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "FaithQuest",
-  description: "Bible study student growth and reward management system"
+  title: "FaithQuest — Gamified Sunday School & Outreach Learning System",
+  description:
+    "Interactive classroom projector dashboard, student faith growth visualizer, live quizzes, and rewards management.",
+  icons: {
+    icon: "/favicon.ico"
+  }
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
+  maximumScale: 5,
   themeColor: "#0f766e"
 };
 
@@ -19,6 +24,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+      </head>
       <body>{children}</body>
     </html>
   );
