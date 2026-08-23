@@ -565,7 +565,7 @@ export function checkAndAwardBadges(
 // 4. MAIN FAITHQUEST APPLICATION COMPONENT
 // ==========================================
 
-export default function Home() {
+export default function Home({ classId }: { classId?: string } = {}) {
   // --- Persistent States ---
   const [students, setStudents] = useState<Student[]>(starterStudents);
   const [quizzes, setQuizzes] = useState<SavedQuiz[]>(starterQuizzes);
@@ -654,7 +654,7 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Live session clock
+  // Projector live clock ticker
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
@@ -674,7 +674,7 @@ export default function Home() {
     let cancelled = false;
 
     async function hydrate() {
-      const persisted = await loadPersistedState();
+      const persisted = await loadPersistedState(classId);
       if (cancelled) return;
 
       if (!persisted) {
@@ -719,7 +719,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [classId]);
 
   // Sync state changes from Supabase
   useEffect(() => {
@@ -746,12 +746,12 @@ export default function Home() {
 
       setTheme((curr) => (curr !== newState.theme ? newState.theme : curr));
       setSoundOn((curr) => (curr !== newState.sound ? newState.sound : curr));
-    });
+    }, classId);
 
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, []);
+  }, [classId]);
 
   // Save whenever state changes
   useEffect(() => {
@@ -765,8 +765,8 @@ export default function Home() {
     const serialized = JSON.stringify(stateToSave);
     if (serialized === lastSavedStateRef.current) return;
     lastSavedStateRef.current = serialized;
-    void savePersistedState(stateToSave);
-  }, [students, quizzes, theme, soundOn]);
+    void savePersistedState(stateToSave, classId);
+  }, [students, quizzes, theme, soundOn, classId]);
 
   // Apply theme to body dataset
   useEffect(() => {
