@@ -1,20 +1,23 @@
 # FaithQuest
 
-FaithQuest is a teacher-first ministry tracking app for Sunday school, youth groups, and outreach programs. It helps leaders manage students, award faith points, track attendance, unlock badges, run Bible quizzes, and celebrate growth in a fun, game-like classroom experience.
+FaithQuest is a teacher-first ministry management and classroom gamification app for Sunday schools, youth groups, and outreach programs. It helps ministry leaders manage classes and students, award Faith Points, track attendance, unlock badges, run Bible quizzes, and celebrate growth in a fun, game-like classroom experience.
 
-The app is designed for live use on a projector or shared screen during class. It keeps the experience simple: one unified interface, no student login flow, and fast teacher controls for awarding points and tracking participation in real time.
+The app combines authenticated teacher and administrator portals with a live classroom experience. Teachers use fast controls to award points and track participation in real time, while students participate through the teacher-controlled projector or shared-screen view without needing individual accounts.
 
 ## Overview
 
-FaithQuest gives ministry leaders a single place to:
+FaithQuest gives ministry leaders a connected system to:
 
-- Manage student profiles and groups
+- Sign in as a teacher or administrator
+- Manage churches, teachers, classes, and student profiles
+- Open class-specific classroom workspaces
 - Record Sunday School and Outreach attendance
 - Award points for participation, scripture memorization, helping others, and quiz success
 - Unlock progression badges and motivational milestones
 - Redeem fish and decor rewards from a reward catalog
 - Create and run Bible quizzes live in class
 - Maintain session continuity with browser storage or Supabase persistence
+- View organization-wide analytics as an administrator
 
 ## Core features
 
@@ -24,6 +27,20 @@ FaithQuest gives ministry leaders a single place to:
 - Review each student’s points, rewards, and badges
 - View recent activity and progress highlights
 - Explore student profiles in a visual ministry dashboard
+
+### Teacher dashboard
+
+- View all classes owned by the signed-in teacher
+- Create new classes and generate join codes
+- Open a classroom scoped to a specific class
+- See class student counts and recent activity
+
+### Administrator portal
+
+- View system-wide churches, teachers, classes, and students
+- Manage churches, teachers and staff, and classes
+- Review student, attendance, points, quiz, badge, and Faith Tree analytics
+- Use protected administrator navigation and role-based access control
 
 ### Attendance tracking
 
@@ -58,26 +75,46 @@ FaithQuest gives ministry leaders a single place to:
 - Support Supabase-backed persistence when environment variables are configured
 - Restore prior state automatically across sessions
 
+### Authentication and access
+
+- Supabase Auth supports email/password and Google OAuth sign-in
+- User profiles determine teacher or administrator access
+- Unauthenticated users are redirected to `/auth/signin`
+- Teachers are routed to `/dashboard`
+- Administrators are routed to `/admin`
+- Each teacher classroom is available at `/teacher/[classId]`
+- Middleware refreshes sessions and protects dashboard, classroom, and admin routes
+
 ## Tech stack
 
-- Next.js
-- React
-- TypeScript
+- Next.js 16 with the App Router
+- React 19 and TypeScript
+- Supabase Auth, database, and optional realtime persistence
+- `@supabase/ssr` for browser, server, and middleware clients
 - Lucide React icons
-- Supabase client for optional cloud persistence
+- Recharts for analytics visualizations
 
 ## Project structure
 
 ```text
 .
 ├── app/
-│   ├── components/
+│   ├── admin/             # Protected administrator portal and analytics
+│   ├── auth/              # Sign in, sign up, and OAuth callback
+│   ├── components/        # Shared UI primitives
+│   ├── dashboard/         # Teacher class dashboard
+│   ├── teacher/[classId]/ # Class-scoped classroom experience
+│   ├── fq-admin-7m3p/     # Administrator sign-in entry
 │   ├── lib/
-│   │   └── persistence.ts
+│   │   ├── persistence.ts
+│   │   └── supabase/      # Supabase browser, server, and middleware clients
 │   ├── globals.css
 │   ├── layout.tsx
 │   ├── page.tsx
 │   └── FaithQuest-Redesign-Plan.md
+├── middleware.ts          # Session refresh and route protection
+├── supabase/migrations/   # Multitenancy and RLS database schema
+├── design-system/         # FaithQuest visual design references
 ├── design-system/
 │   └── faithquest/
 ├── context/
@@ -147,13 +184,14 @@ NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-When those values are present, the app automatically uses Supabase-backed persistence instead of relying only on browser storage.
+When those values are present, the app uses Supabase Auth and database-backed persistence. Without them, the local classroom persistence layer can still be used for local development, but authenticated portal features require a configured Supabase project.
 
 ## Notes
 
 - This project is intended for ministry leaders and teachers managing kids and youth engagement.
-- Data is primarily stored client-side unless Supabase is configured.
+- Data is stored in browser storage for local classroom use and in Supabase when configured.
 - The interface is optimized for quick, classroom-friendly operation during lessons, events, and outreach programs.
+- Classroom data should remain scoped to the selected class when using the multitenant Supabase schema.
 
 ## License
 
