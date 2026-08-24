@@ -117,13 +117,30 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
 ## File Map
 ```
 app/
-├── page.tsx              # Main application (all views, state, logic)
+├── page.tsx              # Main application (all views, state, logic) ~3,450 lines
 ├── layout.tsx            # HTML shell, fonts, metadata
-├── globals.css           # Design system, themes, animations
+├── globals.css           # Design system, themes, animations (claymorphic, CSS variables)
 ├── lib/
-│   └── persistence.ts    # localStorage + Supabase sync
-└── FaithQuest-Redesign-Plan.md  # Design reference
+│   └── persistence.ts    # localStorage + Supabase sync (multi-tenant class support)
+├── components/           # (empty - all components in page.tsx)
+└── FaithQuest-Redesign-Plan.md  # Complete redesign spec (25+ badges, new attendance flow, quiz modes)
+
+.next/                    # Next.js build output (gitignored)
+node_modules/             # Dependencies (gitignored)
 ```
+
+## Multi-Tenant Architecture (Supabase)
+
+When `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` are configured:
+
+- **Authentication**: Supabase Auth with email/password + magic links
+- **RLS Policies**: Row-level security on `students`, `activities`, `quizzes`, `teacher_classes` tables
+- **Class Isolation**: Each teacher gets a `class_id` — all data scoped to their class
+- **Real-time Sync**: Supabase Realtime channels (`faithquest-class-{classId}`) for live collaboration
+- **Admin Dashboard**: Teacher can manage class settings, view analytics
+- **Schema**: `teacher_classes`, `students`, `activities`, `quizzes`, `student_rewards` tables
+
+The app gracefully falls back to localStorage-only mode when Supabase env vars are absent.
 
 ## Testing
 No test framework configured. Manual testing via `npm run dev` on `http://localhost:3000`.
