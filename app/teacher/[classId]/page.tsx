@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
-import Home from "@/app/page";
+import { ClassroomPage } from "@/app/page";
 import { ArrowLeft, Church, Sparkles } from "lucide-react";
 import { createClient } from "@/app/lib/supabase/client";
 
@@ -77,7 +77,7 @@ export default function TeacherClassroomPage({
       </div>
 
       {/* Render the FaithQuest Classroom SPA scoped to this classId */}
-      <Home classId={classId} />
+      <ClassroomPage classId={classId} />
     </div>
   );
 }

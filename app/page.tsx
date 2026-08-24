@@ -47,7 +47,9 @@ import {
   Crown
 } from "lucide-react";
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { loadPersistedState, savePersistedState, subscribeToStateChanges } from "./lib/persistence";
+import { createClient } from "./lib/supabase/client";
 
 // ==========================================
 // 1. DATA TYPES & INTERFACES
@@ -565,7 +567,40 @@ export function checkAndAwardBadges(
 // 4. MAIN FAITHQUEST APPLICATION COMPONENT
 // ==========================================
 
-export default function Home({ classId }: { classId?: string } = {}) {
+export default function Home() {
+  const router = useRouter();
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function routeUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      if (!user) {
+        router.replace("/auth/signin");
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      router.replace(profile?.role === "admin" ? "/admin" : "/dashboard");
+    }
+
+    routeUser();
+  }, [router, supabase]);
+
+  return (
+    <div style={{ textAlign: "center", padding: "60px 20px" }}>
+      <h1>FaithQuest</h1>
+      <p>Loading...</p>
+    </div>
+  );
+}
+
+export function ClassroomPage({ classId }: { classId?: string } = {}) {
   // --- Persistent States ---
   const [students, setStudents] = useState<Student[]>(starterStudents);
   const [quizzes, setQuizzes] = useState<SavedQuiz[]>(starterQuizzes);
