@@ -10,7 +10,8 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Church
+  Church,
+  ChevronDown
 } from "lucide-react";
 
 interface TeacherProfile {
@@ -29,6 +30,8 @@ interface ChurchOption {
   name: string;
 }
 
+const PAGE_SIZE = 25;
+
 export default function AdminTeachersPage() {
   const supabase = createClient();
 
@@ -41,31 +44,49 @@ export default function AdminTeachersPage() {
   const [toast, setToast] = useState<{ title: string; type: "success" | "error" } | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+
   const showToast = (title: string, type: "success" | "error") => {
     setToast({ title, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-
-    // Fetch churches for the filter dropdown
+  const fetchChurches = useCallback(async () => {
     const { data: churchData } = await supabase
       .from("churches")
       .select("id, name")
       .order("name");
     if (churchData) setChurches(churchData);
+  }, [supabase]);
 
-    // Fetch teachers with their class count
-    const { data: profiles } = await supabase
+  const fetchTeachers = useCallback(async (pageNum: number, append = false) => {
+    if (pageNum === 0) setLoading(true);
+    else setLoadingMore(true);
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = supabase
       .from("profiles")
-      .select("*, teacher_classes(id, church_id, churches(name))")
-      .order("created_at", { ascending: false });
+      .select("*, teacher_classes(id, church_id, churches(name))", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-    if (profiles) {
-      const formatted: TeacherProfile[] = profiles.map((p: any) => {
+    // Apply role filter at database level
+    if (filterRole !== "all") {
+      query = query.eq("role", filterRole);
+    }
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching teachers:", error);
+    } else if (data) {
+      const formatted: TeacherProfile[] = data.map((p: any) => {
         const classes = p.teacher_classes || [];
-        // Determine the church from the first class they own
         const firstClassWithChurch = classes.find((c: any) => c.church_id);
         return {
           id: p.id,
@@ -78,12 +99,52 @@ export default function AdminTeachersPage() {
           church_name: firstClassWithChurch?.churches?.name || null,
         };
       });
-      setTeachers(formatted);
+
+      // Apply church filter in memory (since it's derived from teacher_classes)
+      const filtered = filterChurch === "all"
+        ? formatted
+        : filterChurch === "none"
+        ? formatted.filter(t => !t.church_id)
+        : formatted.filter(t => t.church_id === filterChurch);
+
+      // Apply search filter in memory
+      const searched = filtered.filter(t =>
+        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        t.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+
+      if (append) {
+        setTeachers(prev => [...prev, ...searched]);
+      } else {
+        setTeachers(searched);
+      }
+      setHasMore(formatted.length === PAGE_SIZE && (count || 0) > (pageNum + 1) * PAGE_SIZE);
     }
-    setLoading(false);
-  }, [supabase]);
+
+    if (pageNum === 0) setLoading(false);
+    else setLoadingMore(false);
+  }, [supabase, filterRole, filterChurch, searchQuery]);
+
+  const fetchData = useCallback(async () => {
+    await fetchChurches();
+    await fetchTeachers(0, false);
+    setPage(0);
+  }, [fetchChurches, fetchTeachers]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    await fetchTeachers(nextPage, true);
+    setPage(nextPage);
+  }, [page, hasMore, loadingMore, fetchTeachers]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(0);
+    fetchTeachers(0, false);
+  }, [filterRole, filterChurch, searchQuery, fetchTeachers]);
 
   const handleRoleChange = async (userId: string, newRole: "admin" | "teacher") => {
     setUpdatingId(userId);
@@ -276,7 +337,7 @@ export default function AdminTeachersPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredTeachers.map((t) => (
+                {teachers.map((t) => (
                   <tr key={t.id} style={{ borderBottom: "1px solid var(--card-border, #e2e8f0)" }}>
                     {/* Name + Role Badge */}
                     <td style={{ padding: "12px 14px" }}>
@@ -366,6 +427,38 @@ export default function AdminTeachersPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Load More */}
+        {hasMore && !loading && (
+          <div style={{ textAlign: "center", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--card-border, #e2e8f0)" }}>
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "8px",
+                padding: "10px 20px", borderRadius: "10px",
+                background: loadingMore ? "var(--card-surface-alt, #f1f5f9)" : "var(--primary, #0f766e)",
+                color: loadingMore ? "var(--text-muted, #64748b)" : "#fff",
+                fontWeight: 700, fontSize: "0.85rem", border: "none", cursor: loadingMore ? "not-allowed" : "pointer"
+              }}
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <span>Load More</span>
+                  <ChevronDown size={16} />
+                </>
+              )}
+            </button>
+            <p style={{ margin: "8px 0 0", fontSize: "0.75rem", color: "var(--text-muted, #64748b)" }}>
+              Showing {teachers.length} teachers
+            </p>
           </div>
         )}
       </div>

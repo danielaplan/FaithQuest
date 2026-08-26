@@ -20,6 +20,33 @@ function SignInContent() {
 
   const supabase = createClient();
 
+  const ensureUserProfile = async (user: any) => {
+    if (!user) return null;
+
+    const { data: profile, error } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profile) return profile;
+    if (error && error.code !== "PGRST116") throw error;
+
+    const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Teacher";
+    const { error: insertError } = await supabase.from("profiles").upsert(
+      {
+        id: user.id,
+        email: user.email ?? `${user.id}@placeholder.local`,
+        name: fallbackName,
+        role: "teacher",
+      },
+      { onConflict: "id" }
+    );
+
+    if (insertError) throw insertError;
+    return { role: "teacher" };
+  };
+
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -30,25 +57,28 @@ function SignInContent() {
     if (error) {
       setErrorMsg(error.message);
       setLoading(false);
-    } else if (data.user) {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.user.id)
-        .single();
+      return;
+    }
 
-      if (profile?.role === "admin") {
-        router.push("/admin");
-      } else if (loginMode === "admin") {
-        // They tried admin mode but aren't admin
-        await supabase.auth.signOut();
-        setErrorMsg("This account does not have admin access.");
+    if (data.user) {
+      try {
+        const profile = await ensureUserProfile(data.user);
+
+        if (profile?.role === "admin") {
+          router.push("/admin");
+        } else if (loginMode === "admin") {
+          await supabase.auth.signOut();
+          setErrorMsg("This account does not have admin access.");
+          setLoading(false);
+          return;
+        } else {
+          router.push(next);
+        }
+        router.refresh();
+      } catch (profileError: any) {
+        setErrorMsg(profileError?.message || "Unable to load your profile. Please try again.");
         setLoading(false);
-        return;
-      } else {
-        router.push(next);
       }
-      router.refresh();
     }
   };
 
@@ -59,6 +89,10 @@ function SignInContent() {
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        queryParams: {
+          access_type: "offline",
+          prompt: "consent",
+        },
       },
     });
 

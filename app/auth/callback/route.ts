@@ -10,17 +10,35 @@ export async function GET(request: Request) {
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) {
-      // Check user role for smart redirect
       const { data: { user } } = await supabase.auth.getUser();
       let redirectPath = next;
+
       if (user) {
-        const { data: profile } = await supabase
+        const { data: profile, error: profileError } = await supabase
           .from("profiles")
           .select("role")
           .eq("id", user.id)
-          .single();
-        if (profile?.role === "admin") {
-          redirectPath = "/admin";
+          .maybeSingle();
+
+        if (profile) {
+          if (profile.role === "admin") {
+            redirectPath = "/admin";
+          }
+        } else if (!profileError || profileError.code === "PGRST116") {
+          const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Teacher";
+          const { error: insertError } = await supabase.from("profiles").upsert(
+            {
+              id: user.id,
+              email: user.email ?? `${user.id}@placeholder.local`,
+              name: fallbackName,
+              role: "teacher",
+            },
+            { onConflict: "id" }
+          );
+
+          if (insertError) {
+            console.error("Failed to create profile during OAuth callback:", insertError);
+          }
         }
       }
 
@@ -36,6 +54,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // return the user to an error page with instructions
   return NextResponse.redirect(`${origin}/auth/signin?error=auth_failed`);
 }

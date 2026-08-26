@@ -12,7 +12,8 @@ import {
   X,
   Eye,
   Church,
-  ChevronRight
+  ChevronRight,
+  ChevronDown
 } from "lucide-react";
 
 interface ClassItem {
@@ -39,6 +40,8 @@ interface ChurchOption {
   name: string;
 }
 
+const PAGE_SIZE = 25;
+
 export default function AdminClassesPage() {
   const supabase = createClient();
 
@@ -51,22 +54,47 @@ export default function AdminClassesPage() {
   const [roster, setRoster] = useState<StudentItem[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  // Pagination state
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
 
+  const fetchChurches = useCallback(async () => {
     const { data: churchData } = await supabase
       .from("churches")
       .select("id, name")
       .order("name");
     if (churchData) setChurches(churchData);
+  }, [supabase]);
 
-    const { data } = await supabase
+  const fetchClasses = useCallback(async (pageNum: number, append = false) => {
+    if (pageNum === 0) setLoading(true);
+    else setLoadingMore(true);
+
+    const from = pageNum * PAGE_SIZE;
+    const to = from + PAGE_SIZE - 1;
+
+    let query = supabase
       .from("teacher_classes")
-      .select("*, profiles:user_id(name, email), students(id), churches(name)")
-      .order("created_at", { ascending: false });
+      .select("*, profiles:user_id(name, email), students(id), churches(name)", { count: "exact" })
+      .order("created_at", { ascending: false })
+      .range(from, to);
 
-    if (data) {
-      setClasses(data.map((c: any) => ({
+    // Apply church filter at database level
+    if (filterChurch !== "all") {
+      if (filterChurch === "none") {
+        query = query.is("church_id", null);
+      } else {
+        query = query.eq("church_id", filterChurch);
+      }
+    }
+
+    const { data, count, error } = await query;
+
+    if (error) {
+      console.error("Error fetching classes:", error);
+    } else if (data) {
+      const mapped = data.map((c: any) => ({
         id: c.id,
         class_name: c.class_name,
         join_code: c.join_code,
@@ -76,12 +104,40 @@ export default function AdminClassesPage() {
         student_count: Array.isArray(c.students) ? c.students.length : 0,
         church_id: c.church_id || null,
         church_name: c.churches?.name || null,
-      })));
+      }));
+
+      if (append) {
+        setClasses(prev => [...prev, ...mapped]);
+      } else {
+        setClasses(mapped);
+      }
+      setHasMore(mapped.length === PAGE_SIZE && (count || 0) > (pageNum + 1) * PAGE_SIZE);
     }
-    setLoading(false);
-  }, [supabase]);
+
+    if (pageNum === 0) setLoading(false);
+    else setLoadingMore(false);
+  }, [supabase, filterChurch]);
+
+  const fetchData = useCallback(async () => {
+    await fetchChurches();
+    await fetchClasses(0, false);
+    setPage(0);
+  }, [fetchChurches, fetchClasses]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return;
+    const nextPage = page + 1;
+    await fetchClasses(nextPage, true);
+    setPage(nextPage);
+  }, [page, hasMore, loadingMore, fetchClasses]);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPage(0);
+    fetchClasses(0, false);
+  }, [filterChurch, fetchClasses]);
 
   const handleInspectRoster = async (cls: ClassItem) => {
     setSelectedClass(cls);
@@ -184,7 +240,7 @@ export default function AdminClassesPage() {
             <Loader2 size={32} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px auto" }} />
             <p style={{ margin: 0, fontWeight: 600 }}>Loading classrooms...</p>
           </div>
-        ) : filteredClasses.length === 0 ? (
+        ) : classes.length === 0 ? (
           <div style={{ padding: "40px", textAlign: "center", color: "var(--text-muted, #64748b)" }}>
             No classrooms found.
           </div>
@@ -207,7 +263,7 @@ export default function AdminClassesPage() {
                 </tr>
               </thead>
               <tbody>
-                {filteredClasses.map((cls) => (
+                {classes.map((cls) => (
                   <tr key={cls.id} style={{ borderBottom: "1px solid var(--card-border, #e2e8f0)" }}>
                     <td style={{ padding: "12px 14px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
@@ -307,6 +363,38 @@ export default function AdminClassesPage() {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Load More */}
+        {hasMore && !loading && (
+          <div style={{ textAlign: "center", marginTop: "20px", paddingTop: "16px", borderTop: "1px solid var(--card-border, #e2e8f0)" }}>
+            <button
+              onClick={loadMore}
+              disabled={loadingMore}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: "8px",
+                padding: "10px 20px", borderRadius: "10px",
+                background: loadingMore ? "var(--card-surface-alt, #f1f5f9)" : "var(--primary, #0f766e)",
+                color: loadingMore ? "var(--text-muted, #64748b)" : "#fff",
+                fontWeight: 700, fontSize: "0.85rem", border: "none", cursor: loadingMore ? "not-allowed" : "pointer"
+              }}
+            >
+              {loadingMore ? (
+                <>
+                  <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <>
+                  <span>Load More</span>
+                  <ChevronDown size={16} />
+                </>
+              )}
+            </button>
+            <p style={{ margin: "8px 0 0", fontSize: "0.75rem", color: "var(--text-muted, #64748b)" }}>
+              Showing {classes.length} classes
+            </p>
           </div>
         )}
       </div>
