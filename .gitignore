@@ -6,3 +6,18 @@ out
 .vscode/
 .env
 .env.local
+
+# Local assistant and workspace tooling
+.agents/
+.claude/
+.continue/
+.21st/
+.tsupgrader/
+.mcp.json
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+Thumbs.db
