@@ -28,7 +28,7 @@ export default function AdminBadgesPage() {
 
     const { data: students } = await supabase
       .from("students")
-      .select("id, name, badges, activities(points), teacher_classes(class_name)");
+      .select("id, name, student_badges(badges(code)), activities(points), teacher_classes(class_name)");
 
     if (students) {
       // Faith Level distribution
@@ -62,8 +62,9 @@ export default function AdminBadgesPage() {
         }
 
         // Badge frequency
-        (s.badges || []).forEach((b: string) => {
-          badgeFreq[b] = (badgeFreq[b] || 0) + 1;
+        (s.student_badges || []).forEach((award: any) => {
+          const code = award.badges?.code;
+          if (code) badgeFreq[code] = (badgeFreq[code] || 0) + 1;
         });
       });
 

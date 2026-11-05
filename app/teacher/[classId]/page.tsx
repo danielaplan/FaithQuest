@@ -13,23 +13,41 @@ export default function TeacherClassroomPage({
 }) {
   const { classId } = use(params);
   const [className, setClassName] = useState<string>("");
+  const [authorized, setAuthorized] = useState<boolean | null>(null);
   const supabase = createClient();
 
   useEffect(() => {
     async function fetchClassInfo() {
       if (!classId) return;
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("teacher_classes")
         .select("class_name")
         .eq("id", classId)
         .maybeSingle();
 
-      if (data?.class_name) {
+      if (!error && data?.class_name) {
         setClassName(data.class_name);
+        setAuthorized(true);
+      } else {
+        setAuthorized(false);
       }
     }
     fetchClassInfo();
   }, [classId, supabase]);
+
+  if (authorized === null) {
+    return <div style={{ padding: "48px", textAlign: "center" }}>Verifying class access…</div>;
+  }
+
+  if (!authorized) {
+    return (
+      <div style={{ padding: "48px", textAlign: "center", fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <h1>Class access denied</h1>
+        <p>This class does not exist or is not assigned to your account.</p>
+        <Link href="/dashboard">Return to Teacher Dashboard</Link>
+      </div>
+    );
+  }
 
   return (
     <div style={{ position: "relative" }}>

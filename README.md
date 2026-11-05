@@ -71,9 +71,10 @@ FaithQuest gives ministry leaders a connected system to:
 
 ### Persistence
 
-- Store application state in local browser storage by default
-- Support Supabase-backed persistence when environment variables are configured
-- Restore prior state automatically across sessions
+- Use Supabase PostgreSQL as the authoritative store for shared classroom data
+- Store only local UI preferences such as theme and sound in browser storage
+- Synchronize authorized classroom changes through Supabase Realtime
+- Archive students and preserve historical activities
 
 ### Authentication and access
 
@@ -112,7 +113,7 @@ FaithQuest gives ministry leaders a connected system to:
 │   ├── layout.tsx
 │   ├── page.tsx
 │   └── FaithQuest-Redesign-Plan.md
-├── middleware.ts          # Session refresh and route protection
+├── proxy.ts               # Session refresh and route protection
 ├── supabase/migrations/   # Multitenancy and RLS database schema
 ├── design-system/         # FaithQuest visual design references
 ├── design-system/
@@ -177,14 +178,29 @@ Runs ESLint checks against the project.
 
 ## Environment configuration
 
-The app works in local-only mode without any setup. If you want to enable optional Supabase persistence, create a `.env.local` file in the project root and add:
+Multi-user development requires a configured Supabase project. Create a `.env.local` file in the project root and add:
 
 ```env
 NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-When those values are present, the app uses Supabase Auth and database-backed persistence. Without them, the local classroom persistence layer can still be used for local development, but authenticated portal features require a configured Supabase project.
+The URL and public key must belong to the same Supabase project. Never expose a service-role key in a browser environment variable.
+
+## Database migrations
+
+Apply the SQL migrations in numeric order to an isolated Supabase project before production:
+
+1. `01_multitenancy_schema.sql`
+2. `02_fix_rls_policies.sql`
+3. `03_add_updated_at_soft_delete.sql`
+4. `04_multi_user_security.sql`
+5. `05_multi_user_classroom.sql`
+6. `06_admin_analytics.sql`
+7. `07_classroom_commands.sql`
+8. `08_class_scoped_realtime.sql`
+
+Migrations 04–08 secure role changes and ownership, add relational badge awards, seed stable catalogs, move admin aggregation into PostgreSQL, add idempotent classroom commands, and scope Realtime invalidation to one class. Back up and restore-test any existing project before applying them.
 
 ## Notes
 

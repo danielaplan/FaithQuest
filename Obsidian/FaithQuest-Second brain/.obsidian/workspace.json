@@ -115,7 +115,6 @@
             "state": {
               "type": "backlink",
               "state": {
-                "file": "Welcome.md",
                 "collapseAll": false,
                 "extraContext": false,
                 "sortOrder": "alphabetical",
@@ -134,7 +133,6 @@
             "state": {
               "type": "outgoing-link",
               "state": {
-                "file": "Welcome.md",
                 "linksCollapsed": false,
                 "unlinkedCollapsed": true
               },
@@ -177,7 +175,6 @@
             "state": {
               "type": "outline",
               "state": {
-                "file": "Welcome.md",
                 "followCursor": false,
                 "showSearch": false,
                 "searchQuery": ""
@@ -204,8 +201,12 @@
       "bases:Create new base": false
     }
   },
-  "active": "54dc088c4925896f",
+  "active": "1b9b86bec14bf07e",
   "lastOpenFiles": [
+    "09 - Evidence/Test Results.md",
+    "07 - Planning/Completed Work.md",
+    "07 - Planning/Current Sprint.md",
+    "Welcome.md",
     "07 - Planning/Roadmap.md",
     "06 - Quality/Load Testing.md",
     "06 - Quality/Multi-User Tests.md",
@@ -228,10 +229,6 @@
     "04 - Security/Security Overview.md",
     "03 - Database/Backup and Recovery.md",
     "03 - Database/Migrations.md",
-    "03 - Database/RLS and Permissions.md",
-    "03 - Database/Tables and Relationships.md",
-    "03 - Database/ERD.md",
-    "03 - Database/Database Overview.md",
     "Attachments",
     "99 - Archive/Superseded Decisions",
     "99 - Archive/Old Plans",

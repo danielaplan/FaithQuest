@@ -24,21 +24,9 @@ export async function GET(request: Request) {
           if (profile.role === "admin") {
             redirectPath = "/admin";
           }
-        } else if (!profileError || profileError.code === "PGRST116") {
-          const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Teacher";
-          const { error: insertError } = await supabase.from("profiles").upsert(
-            {
-              id: user.id,
-              email: user.email ?? `${user.id}@placeholder.local`,
-              name: fallbackName,
-              role: "teacher",
-            },
-            { onConflict: "id" }
-          );
-
-          if (insertError) {
-            console.error("Failed to create profile during OAuth callback:", insertError);
-          }
+        } else if (profileError) {
+          console.error("Failed to load profile during OAuth callback:", profileError);
+          return NextResponse.redirect(`${origin}/auth/signin?error=profile_missing`);
         }
       }
 

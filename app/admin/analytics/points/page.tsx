@@ -54,44 +54,31 @@ export default function AdminPointsPage() {
   const fetchData = useCallback(async () => {
     setLoading(true);
 
-    const { data: students } = await supabase
-      .from("students")
-      .select("id, name, activities(points, kind), teacher_classes(class_name, churches(name))");
+    const { data, error } = await supabase.rpc("admin_points_analytics", { p_limit: 100 });
 
-    if (students) {
-      const entries: LeaderEntry[] = students.map((s: any) => {
-        const acts = s.activities || [];
-        const pts = acts.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
-        return {
-          rank: 0,
-          name: s.name,
-          class_name: s.teacher_classes?.class_name || "—",
-          church_name: s.teacher_classes?.churches?.name || "—",
-          total_points: pts,
-          faith_icon: getFaithIcon(pts),
-        };
-      }).sort((a, b) => b.total_points - a.total_points).map((e, i) => ({ ...e, rank: i + 1 }));
+    if (!error && data) {
+      const result = data as unknown as {
+        leaderboard: Array<Omit<LeaderEntry, "rank" | "faith_icon">>;
+        breakdown: Array<{ kind: string; points: number }>;
+        totalPoints: number;
+      };
+      const entries: LeaderEntry[] = (result.leaderboard || []).map((entry, index) => ({
+        ...entry,
+        rank: index + 1,
+        faith_icon: getFaithIcon(entry.total_points),
+      }));
 
       setLeaderboard(entries);
 
-      // Activity breakdown
-      const kindTotals: Record<string, number> = {};
-      students.forEach((s: any) => {
-        (s.activities || []).forEach((a: any) => {
-          kindTotals[a.kind] = (kindTotals[a.kind] || 0) + (a.points || 0);
-        });
-      });
-
-      const bkd: ActivityBreakdown[] = Object.entries(kindTotals)
-        .map(([kind, value]) => ({
+      const bkd: ActivityBreakdown[] = (result.breakdown || [])
+        .map(({ kind, points }) => ({
           name: KIND_META[kind]?.label || kind,
-          value,
+          value: points,
           color: KIND_META[kind]?.color || "#6366f1"
-        }))
-        .sort((a, b) => b.value - a.value);
+        }));
 
       setBreakdown(bkd);
-      setTotalPoints(entries.reduce((s, e) => s + e.total_points, 0));
+      setTotalPoints(result.totalPoints || 0);
     }
     setLoading(false);
   }, [supabase]);

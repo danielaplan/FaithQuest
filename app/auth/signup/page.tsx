@@ -38,7 +38,6 @@ function SignUpContent() {
       options: {
         data: {
           name,
-          role: "teacher",
         },
         emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },

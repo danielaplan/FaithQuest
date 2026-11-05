@@ -39,25 +39,8 @@ export default function AdminDashboardPage() {
 
   const loadStats = useCallback(async () => {
     setLoading(true);
-    const [churchesRes, teachersRes, classesRes, studentsRes, activitiesRes] =
-      await Promise.all([
-        supabase.from("churches").select("id", { count: "exact", head: true }),
-        supabase.from("profiles").select("id", { count: "exact", head: true }).eq("role", "teacher"),
-        supabase.from("teacher_classes").select("id", { count: "exact", head: true }),
-        supabase.from("students").select("id", { count: "exact", head: true }),
-        supabase.from("activities").select("points"),
-      ]);
-
-    const totalPts = (activitiesRes.data || []).reduce((sum, a) => sum + (a.points || 0), 0);
-
-    setStats({
-      totalChurches: churchesRes.count || 0,
-      totalTeachers: teachersRes.count || 0,
-      totalClasses: classesRes.count || 0,
-      totalStudents: studentsRes.count || 0,
-      totalPoints: totalPts,
-      totalActivities: activitiesRes.data?.length || 0,
-    });
+    const { data, error } = await supabase.rpc("admin_dashboard_stats");
+    if (!error && data) setStats(data as unknown as AdminStats);
     setLoading(false);
   }, [supabase]);
 

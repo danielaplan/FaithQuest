@@ -148,10 +148,10 @@ export default function AdminTeachersPage() {
 
   const handleRoleChange = async (userId: string, newRole: "admin" | "teacher") => {
     setUpdatingId(userId);
-    const { error } = await supabase
-      .from("profiles")
-      .update({ role: newRole, updated_at: new Date().toISOString() })
-      .eq("id", userId);
+    const { error } = await supabase.rpc("set_user_role", {
+      p_user_id: userId,
+      p_role: newRole,
+    });
 
     if (error) {
       showToast(`Failed to update role: ${error.message}`, "error");

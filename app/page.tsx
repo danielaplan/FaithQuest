@@ -48,7 +48,18 @@ import {
 } from "lucide-react";
 import React, { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { loadPersistedState, savePersistedState, subscribeToStateChanges } from "./lib/persistence";
+import {
+  archivePersistedStudent,
+  createPersistedStudent,
+  deletePersistedQuiz,
+  loadPersistedState,
+  recordPersistedActivity,
+  redeemPersistedReward,
+  savePersistedState,
+  subscribeToStateChanges,
+  syncPersistedBadges,
+  upsertPersistedQuiz,
+} from "./lib/persistence";
 import { createClient } from "./lib/supabase/client";
 
 // ==========================================
@@ -606,6 +617,9 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
   const [quizzes, setQuizzes] = useState<SavedQuiz[]>(starterQuizzes);
   const [theme, setTheme] = useState<"emerald" | "gold" | "aqua">("emerald");
   const [soundOn, setSoundOn] = useState(true);
+  const [syncState, setSyncState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [syncError, setSyncError] = useState("");
+  const [syncRetry, setSyncRetry] = useState(0);
 
   // --- UI Navigation / View States ---
   const [activeView, setActiveView] = useState<
@@ -713,13 +727,15 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
       if (cancelled) return;
 
       if (!persisted) {
-        setStudents(starterStudents);
-        setQuizzes(starterQuizzes);
+        const initialStudents = classId ? [] : starterStudents;
+        const initialQuizzes = classId ? [] : starterQuizzes;
+        setStudents(initialStudents);
+        setQuizzes(initialQuizzes);
         setTheme("emerald");
         setSoundOn(true);
         lastSavedStateRef.current = JSON.stringify({
-          students: starterStudents,
-          quizzes: starterQuizzes,
+          students: initialStudents,
+          quizzes: initialQuizzes,
           theme: "emerald",
           sound: true
         });
@@ -800,8 +816,19 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     const serialized = JSON.stringify(stateToSave);
     if (serialized === lastSavedStateRef.current) return;
     lastSavedStateRef.current = serialized;
-    void savePersistedState(stateToSave, classId);
-  }, [students, quizzes, theme, soundOn, classId]);
+    setSyncState("saving");
+    setSyncError("");
+    const timer = window.setTimeout(() => {
+      void savePersistedState(stateToSave, classId)
+        .then(() => setSyncState("saved"))
+        .catch((error: unknown) => {
+          setSyncState("error");
+          setSyncError(error instanceof Error ? error.message : "Unable to save classroom changes");
+        });
+    }, 300);
+
+    return () => window.clearTimeout(timer);
+  }, [students, quizzes, theme, soundOn, classId, syncRetry]);
 
   // Apply theme to body dataset
   useEffect(() => {
@@ -890,34 +917,43 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     label: string,
     kind: ActivityKind = "custom"
   ) => {
-    let targetName = "";
-    setStudents((prev) =>
-      prev.map((student) => {
-        if (student.id !== studentId) return student;
-        targetName = student.name;
-        const newAct: Activity = {
-          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-          date: today(),
-          kind,
-          label,
-          points
-        };
-        const updatedStudent = {
-          ...student,
-          activities: [newAct, ...(student.activities || [])]
-        };
-        return checkAndAwardBadges(updatedStudent, (bName) => {
-          triggerToast(`🎉 Badge Unlocked!`, `${student.name} earned "${bName}"!`);
-        });
-      })
-    );
+    const student = students.find((item) => item.id === studentId);
+    if (!student) return;
+    const activityDate = today();
+    if ((kind === "attendance" || kind === "outreach")
+      && student.activities.some((activity) => activity.kind === kind && activity.date === activityDate)) {
+      triggerToast("Already recorded", `${student.name} already has ${label} for today.`);
+      return;
+    }
+
+    const newAct: Activity = {
+      id: crypto.randomUUID(),
+      date: activityDate,
+      kind,
+      label,
+      points
+    };
+    const updatedStudent = checkAndAwardBadges({
+      ...student,
+      activities: [newAct, ...(student.activities || [])]
+    }, (bName) => {
+      triggerToast(`🎉 Badge Unlocked!`, `${student.name} earned "${bName}"!`);
+    });
+    setStudents((prev) => prev.map((item) => item.id === studentId ? updatedStudent : item));
+
+    void recordPersistedActivity(studentId, newAct)
+      .then(() => syncPersistedBadges(studentId, updatedStudent.badges || []))
+      .catch((error: unknown) => {
+        setSyncState("error");
+        setSyncError(error instanceof Error ? error.message : "Unable to save activity");
+      });
 
     // Record in live session log
     setLiveSessionLog((prev) => [
       {
         id: `log-${Date.now()}`,
         time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        studentName: targetName || "Student",
+        studentName: student.name,
         label,
         points
       },
@@ -925,7 +961,7 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     ]);
 
     playSynthSound(points >= 20 ? "fanfare" : "sparkles");
-    triggerToast(`+${points} Points!`, `${targetName} received points for: ${label}`);
+    triggerToast(`+${points} Points!`, `${student.name} received points for: ${label}`);
   };
 
   // Bulk Award Points Helper
@@ -938,27 +974,44 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     if (studentIds.length === 0) return;
     const dateStr = today();
 
-    setStudents((prev) =>
-      prev.map((student) => {
-        if (!studentIds.includes(student.id)) return student;
+    const updates = new Map<string, { student: Student; activity: Activity }>();
+    for (const student of students) {
+      if (!studentIds.includes(student.id)) continue;
+      if ((kind === "attendance" || kind === "outreach")
+        && student.activities.some((activity) => activity.kind === kind && activity.date === dateStr)) {
+        continue;
+      }
         const newAct: Activity = {
-          id: `act-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          id: crypto.randomUUID(),
           date: dateStr,
           kind,
           label,
           points
         };
-        const updated = {
+        const updated = checkAndAwardBadges({
           ...student,
           activities: [newAct, ...(student.activities || [])]
-        };
-        return checkAndAwardBadges(updated, (bName) => {
+        }, (bName) => {
           triggerToast(`🎉 Badge Unlocked!`, `${student.name} unlocked "${bName}"!`);
         });
-      })
-    );
+        updates.set(student.id, { student: updated, activity: newAct });
+    }
 
-    studentIds.forEach((id) => {
+    if (updates.size === 0) {
+      triggerToast("Already recorded", "The selected attendance entries already exist for today.");
+      return;
+    }
+
+    setStudents((prev) => prev.map((student) => updates.get(student.id)?.student || student));
+    void Promise.all(Array.from(updates.entries()).map(async ([studentId, update]) => {
+      await recordPersistedActivity(studentId, update.activity);
+      await syncPersistedBadges(studentId, update.student.badges || []);
+    })).catch((error: unknown) => {
+      setSyncState("error");
+      setSyncError(error instanceof Error ? error.message : "Unable to save activities");
+    });
+
+    Array.from(updates.keys()).forEach((id) => {
       const s = students.find((x) => x.id === id);
       if (s) {
         setLiveSessionLog((prev) => [
@@ -975,7 +1028,7 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     });
 
     playSynthSound("fanfare");
-    triggerToast(`⚡ Points Awarded!`, `+${points} points given to ${studentIds.length} students.`);
+    triggerToast(`⚡ Points Awarded!`, `+${points} points given to ${updates.size} students.`);
   };
 
   // ==========================================
@@ -1056,18 +1109,27 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
   // 8. ACTIONS & HANDLERS
   // ==========================================
 
-  const handleAddStudent = (e: FormEvent) => {
+  const handleAddStudent = async (e: FormEvent) => {
     e.preventDefault();
     if (!newStudentName.trim()) return;
     const newStudent: Student = {
-      id: `std-${Date.now()}`,
+      id: crypto.randomUUID(),
       name: newStudentName.trim(),
       group: newStudentGroup,
       joinedAt: today(),
       activities: [],
-      rewards: ["small-fish"],
+      rewards: [],
       badges: []
     };
+    if (classId) {
+      try {
+        await createPersistedStudent(classId, newStudent);
+      } catch (error) {
+        setSyncState("error");
+        setSyncError(error instanceof Error ? error.message : "Unable to add student");
+        return;
+      }
+    }
     setStudents((prev) => [newStudent, ...prev]);
     setNewStudentName("");
     setShowAddStudentModal(false);
@@ -1075,9 +1137,16 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     triggerToast("Student Enrolled", `${newStudent.name} joined ${newStudent.group}!`);
   };
 
-  const handleDeleteStudent = (studentId: string) => {
+  const handleDeleteStudent = async (studentId: string) => {
     const student = students.find((s) => s.id === studentId);
     if (!student) return;
+    try {
+      await archivePersistedStudent(studentId);
+    } catch (error) {
+      setSyncState("error");
+      setSyncError(error instanceof Error ? error.message : "Unable to archive student");
+      return;
+    }
     setStudents((prev) => prev.filter((s) => s.id !== studentId));
     setPendingDeleteStudentId(null);
     if (selectedStudentId === studentId) {
@@ -1088,30 +1157,84 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
     triggerToast("Student Removed", `${student.name} was removed from the roster.`);
   };
 
-  const handleSaveQuiz = (e: FormEvent) => {
+  const handleDeleteQuiz = async (quiz: SavedQuiz) => {
+    try {
+      await deletePersistedQuiz(quiz.id);
+    } catch (error) {
+      setSyncState("error");
+      setSyncError(error instanceof Error ? error.message : "Unable to delete quiz");
+      return;
+    }
+    setQuizzes((prev) => prev.filter((item) => item.id !== quiz.id));
+    triggerToast("Quiz Deleted", `Removed "${quiz.title}"`);
+  };
+
+  const handleRedeemReward = async (student: Student, reward: Reward) => {
+    if (student.rewards.includes(reward.id)) {
+      triggerToast("Already collected", `${student.name} already owns ${reward.name}.`);
+      return;
+    }
+    if (totalPoints(student).available < reward.cost) {
+      triggerToast("Not enough points", `${student.name} needs ${reward.cost} points for ${reward.name}.`);
+      return;
+    }
+
+    try {
+      await redeemPersistedReward(student.id, reward.id);
+    } catch (error) {
+      setSyncState("error");
+      setSyncError(error instanceof Error ? error.message : "Unable to redeem reward");
+      return;
+    }
+
+    setStudents((prev) => prev.map((item) => item.id === student.id
+      ? { ...item, rewards: [...item.rewards, reward.id] }
+      : item));
+    playSynthSound("splash");
+    triggerToast("Reward redeemed", `${student.name} collected ${reward.name}!`);
+  };
+
+  const handleSaveQuiz = async (e: FormEvent) => {
     e.preventDefault();
     if (!builderTitle.trim()) return;
 
+    let savedQuiz: SavedQuiz;
     if (editingQuizId) {
-      setQuizzes((prev) =>
-        prev.map((q) =>
-          q.id === editingQuizId
-            ? { ...q, title: builderTitle.trim(), pointsPerCorrect: builderPoints, questions: builderQuestions }
-            : q
-        )
-      );
-      setEditingQuizId(null);
-      triggerToast("Quiz Updated", `Saved changes to "${builderTitle.trim()}"`);
+      const existingQuiz = quizzes.find((quiz) => quiz.id === editingQuizId);
+      if (!existingQuiz) return;
+      savedQuiz = {
+        ...existingQuiz,
+        title: builderTitle.trim(),
+        pointsPerCorrect: builderPoints,
+        questions: builderQuestions,
+      };
     } else {
-      const newQ: SavedQuiz = {
-        id: `quiz-${Date.now()}`,
+      savedQuiz = {
+        id: crypto.randomUUID(),
         title: builderTitle.trim(),
         pointsPerCorrect: builderPoints,
         questions: builderQuestions,
         createdAt: new Date().toISOString()
       };
-      setQuizzes((prev) => [newQ, ...prev]);
-      triggerToast("Quiz Created", `Added "${newQ.title}" with ${newQ.questions.length} questions!`);
+    }
+
+    if (classId) {
+      try {
+        await upsertPersistedQuiz(classId, savedQuiz);
+      } catch (error) {
+        setSyncState("error");
+        setSyncError(error instanceof Error ? error.message : "Unable to save quiz");
+        return;
+      }
+    }
+
+    if (editingQuizId) {
+      setQuizzes((prev) => prev.map((quiz) => quiz.id === savedQuiz.id ? savedQuiz : quiz));
+      setEditingQuizId(null);
+      triggerToast("Quiz Updated", `Saved changes to "${savedQuiz.title}"`);
+    } else {
+      setQuizzes((prev) => [savedQuiz, ...prev]);
+      triggerToast("Quiz Created", `Added "${savedQuiz.title}" with ${savedQuiz.questions.length} questions!`);
     }
 
     setBuilderTitle("");
@@ -1149,6 +1272,11 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
   };
 
   const handleImportJSON = (e: ChangeEvent<HTMLInputElement>) => {
+    if (classId) {
+      e.target.value = "";
+      triggerToast("Import disabled", "Shared classrooms require a reviewed server-side import.");
+      return;
+    }
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
@@ -1156,10 +1284,20 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (Array.isArray(parsed.students)) {
-          setStudents(parsed.students.map((s: Student) => checkAndAwardBadges(s)));
+          setStudents(parsed.students.map((s: Student) => checkAndAwardBadges({
+            ...s,
+            id: crypto.randomUUID(),
+            activities: (s.activities || []).map((activity) => ({
+              ...activity,
+              id: crypto.randomUUID(),
+            })),
+          })));
         }
         if (Array.isArray(parsed.quizzes)) {
-          setQuizzes(parsed.quizzes);
+          setQuizzes(parsed.quizzes.map((quiz: SavedQuiz) => ({
+            ...quiz,
+            id: crypto.randomUUID(),
+          })));
         }
         if (parsed.theme) setTheme(parsed.theme);
         playSynthSound("success");
@@ -1174,6 +1312,30 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
 
   return (
     <div className={`app-container ${isProjectorMode ? "projector-mode" : ""}`}>
+      {syncState === "error" && (
+        <div role="alert" style={{
+          position: "sticky", top: 0, zIndex: 1000, padding: "10px 16px",
+          background: "#b91c1c", color: "white", textAlign: "center", fontWeight: 700
+        }}>
+          Changes are not saved to Supabase: {syncError}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              lastSavedStateRef.current = "__retry__";
+              setSyncRetry((value) => value + 1);
+            }}
+            style={{ marginLeft: 8, padding: "4px 8px", borderRadius: 6, border: 0, fontWeight: 800 }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+      {syncState === "saving" && (
+        <div aria-live="polite" style={{ position: "fixed", right: 16, bottom: 16, zIndex: 1000,
+          padding: "8px 12px", borderRadius: 10, background: "#0f172a", color: "white", fontSize: 13 }}>
+          Saving…
+        </div>
+      )}
       {/* ==========================================
           HEADER HERO BANNER
           ========================================== */}
@@ -2372,10 +2534,7 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
                       </button>
                       <button
                         className="clay-btn clay-btn-danger clay-btn-sm"
-                        onClick={() => {
-                          setQuizzes((prev) => prev.filter((q) => q.id !== quiz.id));
-                          triggerToast("Quiz Deleted", `Removed "${quiz.title}"`);
-                        }}
+                        onClick={() => void handleDeleteQuiz(quiz)}
                       >
                         <Trash2 size={14} />
                       </button>
@@ -2882,6 +3041,10 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
                   className="clay-btn clay-btn-danger clay-btn-sm"
                   style={{ marginTop: "10px" }}
                   onClick={() => {
+                    if (classId) {
+                      triggerToast("Demo reset disabled", "Shared classrooms cannot be replaced with demo data.");
+                      return;
+                    }
                     if (window.confirm("Reset dataset back to starter demo students and quizzes?")) {
                       setStudents(starterStudents);
                       setQuizzes(starterQuizzes);
@@ -3058,6 +3221,29 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
                   <strong style={{ fontFamily: "Baloo 2", color: "var(--primary)" }}>
                     {totalPoints(selectedStudent).available} pts available to spend
                   </strong>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: "0 0 10px" }}>Aquarium Reward Shop</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" }}>
+                    {rewardCatalog.map((reward) => {
+                      const owned = selectedStudent.rewards.includes(reward.id);
+                      const affordable = totalPoints(selectedStudent).available >= reward.cost;
+                      return (
+                        <button
+                          key={reward.id}
+                          type="button"
+                          className="clay-btn clay-btn-secondary clay-btn-sm"
+                          disabled={owned || !affordable}
+                          onClick={() => void handleRedeemReward(selectedStudent, reward)}
+                          style={{ justifyContent: "space-between", opacity: owned || !affordable ? 0.55 : 1 }}
+                        >
+                          <span>{reward.name}</span>
+                          <strong>{owned ? "Owned" : `${reward.cost} pts`}</strong>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
             )}
@@ -3464,7 +3650,7 @@ export function ClassroomPage({ classId }: { classId?: string } = {}) {
               <button
                 className="clay-btn clay-btn-danger"
                 style={{ flex: 1 }}
-                onClick={() => handleDeleteStudent(pendingDeleteStudentId)}
+                onClick={() => void handleDeleteStudent(pendingDeleteStudentId)}
               >
                 Delete
               </button>

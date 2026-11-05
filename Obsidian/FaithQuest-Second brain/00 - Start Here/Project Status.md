@@ -10,9 +10,9 @@ last_verified: 2026-11-05
 
 ## Current state
 
-FaithQuest builds successfully with Next.js 16 and connects to Supabase Auth and PostgreSQL. Email/password and Google OAuth flows exist, with role-based teacher and administrator routing.
+FaithQuest now has a local multi-user foundation on branch `codex/multi-user-foundation`. Email/password and Google OAuth flows exist, with role-based teacher and administrator routing.
 
-The application is still a prototype for multi-user operation because classroom state is split between browser `localStorage` and partially synchronized Supabase tables.
+New migrations and application commands make Supabase authoritative for shared classroom records. These changes are locally implemented but have not been applied to or accepted against production Supabase.
 
 ## Working in source and local evidence
 
@@ -22,17 +22,17 @@ The application is still a prototype for multi-user operation because classroom 
 - Administrator dashboards and analytics pages exist.
 - The production build completed successfully on 2026-11-04.
 
-## Release blockers
+## Remaining release blockers
 
-1. Prevent teacher-to-admin privilege escalation.
-2. Prevent account deletion from cascading into churches and classes.
-3. Remove starter data from real empty classes.
-4. Make Supabase the single source of truth.
-5. Persist quizzes, badges, rewards, deletions, and archives consistently.
-6. Add multi-user isolation and concurrency tests.
+1. Apply migrations 04–08 to an isolated Supabase project.
+2. Execute real-session RLS tests with Admin A, Teacher A, and Teacher B.
+3. Verify cross-device Realtime behavior and concurrent activity commands.
+4. Restore-test a backup before any production migration.
+5. Run browser acceptance for quizzes, badges, rewards, archives, and analytics.
+6. Review the remaining moderate dependency advisory.
 
 See [[../06 - Quality/Findings Register|Findings Register]].
 
 ## Evidence boundary
 
-The successful local and Vercel builds prove compilation only. Production RLS isolation, multi-device behavior, backups, and user acceptance remain unverified.
+Local tests and compilation prove source-level behavior only. Production RLS isolation, multi-device behavior, backups, and user acceptance remain unverified.

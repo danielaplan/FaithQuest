@@ -29,22 +29,9 @@ function SignInContent() {
       .eq("id", user.id)
       .maybeSingle();
 
-    if (profile) return profile;
-    if (error && error.code !== "PGRST116") throw error;
-
-    const fallbackName = user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split("@")[0] || "Teacher";
-    const { error: insertError } = await supabase.from("profiles").upsert(
-      {
-        id: user.id,
-        email: user.email ?? `${user.id}@placeholder.local`,
-        name: fallbackName,
-        role: "teacher",
-      },
-      { onConflict: "id" }
-    );
-
-    if (insertError) throw insertError;
-    return { role: "teacher" };
+    if (error) throw error;
+    if (!profile) throw new Error("Your account profile is missing. Contact an administrator.");
+    return profile;
   };
 
   const handleEmailSignIn = async (e: React.FormEvent) => {

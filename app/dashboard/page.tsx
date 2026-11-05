@@ -103,28 +103,20 @@ export default function DashboardPage() {
     setCreating(true);
     setErrorMsg("");
 
-    // Generate clean join code (e.g. FQ-7294)
-    const randomCode = "FQ-" + Math.floor(1000 + Math.random() * 9000);
-
     const { data, error } = await supabase
-      .from("teacher_classes")
-      .insert({
-        user_id: profile.id,
-        class_name: newClassName.trim(),
-        join_code: randomCode,
-      })
-      .select()
+      .rpc("create_teacher_class", { p_class_name: newClassName.trim() })
       .single();
 
     if (error) {
       setErrorMsg(error.message);
       setCreating(false);
     } else if (data) {
+      const createdClass = data as { id: string };
       setShowModal(false);
       setNewClassName("");
       setCreating(false);
       // Directly navigate to classroom or reload
-      router.push(`/teacher/${data.id}`);
+      router.push(`/teacher/${createdClass.id}`);
     }
   };
 

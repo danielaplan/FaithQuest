@@ -11,6 +11,11 @@ export type PersistedAppState = {
 const DEFAULT_STORAGE_KEY = "faithquest-state-v2";
 let supabaseClient: SupabaseClient | null | undefined;
 
+function isUuid(value: unknown): value is string {
+  return typeof value === "string"
+    && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function getSupabaseClient() {
   if (typeof window === "undefined") return null;
 
@@ -79,36 +84,48 @@ export async function loadPersistedState(classId?: string): Promise<PersistedApp
           .eq("id", classId)
           .maybeSingle();
 
-        if (!clsError && clsData) {
+        if (clsError) throw clsError;
+        if (clsData) {
           // Check for class students and quizzes in relational tables
-          const { data: dbStudents } = await client
+          const { data: dbStudents, error: studentsError } = await client
             .from("students")
-            .select("*, activities(*), student_rewards(reward_id)")
-            .eq("class_id", classId);
+            .select("*, activities(*), student_rewards(rewards(code)), student_badges(badges(code))")
+            .eq("class_id", classId)
+            .is("archived_at", null)
+            .order("name");
 
-          const { data: dbQuizzes } = await client
+          const { data: dbQuizzes, error: quizzesError } = await client
             .from("quizzes")
             .select("*")
-            .eq("class_id", classId);
+            .eq("class_id", classId)
+            .order("created_at", { ascending: false });
 
-          if (dbStudents && dbStudents.length > 0) {
-            const formattedStudents = dbStudents.map((s: any) => ({
+          if (studentsError) throw studentsError;
+          if (quizzesError) throw quizzesError;
+
+          const formattedStudents = (dbStudents || []).map((s: any) => ({
               id: s.id,
               name: s.name,
               group: s.group_name || "General",
               joinedAt: s.joined_at ? s.joined_at.slice(0, 10) : new Date().toISOString().slice(0, 10),
-              activities: (s.activities || []).map((a: any) => ({
+              activities: (s.activities || []).sort((a: any, b: any) =>
+                String(b.created_at || b.date).localeCompare(String(a.created_at || a.date))
+              ).map((a: any) => ({
                 id: a.id,
                 date: a.date,
                 kind: a.kind,
                 label: a.label,
                 points: a.points,
               })),
-              rewards: (s.student_rewards || []).map((r: any) => r.reward_id),
-              badges: [],
+              rewards: (s.student_rewards || [])
+                .map((r: any) => r.rewards?.code)
+                .filter(Boolean),
+              badges: (s.student_badges || [])
+                .map((b: any) => b.badges?.code)
+                .filter(Boolean),
             }));
 
-            const formattedQuizzes = (dbQuizzes || []).map((q: any) => ({
+          const formattedQuizzes = (dbQuizzes || []).map((q: any) => ({
               id: q.id,
               title: q.title,
               pointsPerCorrect: q.points_per_correct || 10,
@@ -116,14 +133,13 @@ export async function loadPersistedState(classId?: string): Promise<PersistedApp
               questions: q.questions || [],
             }));
 
-            const local = readLocalState(classId);
-            return {
-              students: formattedStudents,
-              quizzes: formattedQuizzes.length > 0 ? formattedQuizzes : (local?.quizzes || []),
-              theme: local?.theme || "emerald",
-              sound: local?.sound ?? true,
-            };
-          }
+          const local = readLocalState(classId);
+          return {
+            students: formattedStudents,
+            quizzes: formattedQuizzes,
+            theme: local?.theme || "emerald",
+            sound: local?.sound ?? true,
+          };
         }
       } else {
         // Fallback / legacy state
@@ -143,67 +159,126 @@ export async function loadPersistedState(classId?: string): Promise<PersistedApp
     }
   }
 
-  return readLocalState(classId);
+  return classId && client ? null : readLocalState(classId);
 }
 
 export async function savePersistedState(state: PersistedAppState, classId?: string): Promise<void> {
   if (typeof window === "undefined") return;
 
-  writeLocalState(state, classId);
-
   const client = getSupabaseClient();
-  if (client) {
-    try {
-      if (classId) {
-        // Save to class in Supabase if online
-        // In background: sync students & activities
-        const students = (state.students || []) as any[];
-        for (const st of students) {
-          if (!st.name) continue;
-          // Upsert student
-          const { data: upsertedStudent } = await client
-            .from("students")
-            .upsert(
-              {
-                id: st.id && st.id.length > 20 ? st.id : undefined,
-                class_id: classId,
-                name: st.name,
-                group_name: st.group || "General",
-              },
-              { onConflict: "id" }
-            )
-            .select("id")
-            .single();
+  writeLocalState(client && classId ? { ...state, students: [], quizzes: [] } : state, classId);
 
-          const studentDbId = upsertedStudent?.id || st.id;
-
-          // Upsert activities
-          if (Array.isArray(st.activities) && st.activities.length > 0 && studentDbId) {
-            const acts = st.activities.map((a: any) => ({
-              id: a.id && a.id.length > 20 ? a.id : undefined,
-              student_id: studentDbId,
-              kind: a.kind || "attendance",
-              points: a.points || 0,
-              date: a.date || new Date().toISOString().slice(0, 10),
-              label: a.label || "Activity",
-            }));
-            await client.from("activities").upsert(acts, { onConflict: "id" });
-          }
-        }
-      } else {
-        await client.from("faithquest_state").upsert(
-          {
-            id: "main",
-            content: state,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "id" }
-        );
-      }
-    } catch (error) {
-      console.warn("Failed to sync state to Supabase, data is safe locally in localStorage", error);
-    }
+  if (client && !classId) {
+    const { error } = await client.from("faithquest_state").upsert(
+      {
+        id: "main",
+        content: state,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    );
+    if (error) throw error;
   }
+}
+
+export async function createPersistedStudent(
+  classId: string,
+  student: { id: string; name: string; group: string }
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  if (!isUuid(student.id)) throw new Error("Student has an invalid ID");
+
+  const { error } = await client.from("students").insert({
+    id: student.id,
+    class_id: classId,
+    name: student.name,
+    group_name: student.group || "General",
+  });
+  if (error) throw error;
+}
+
+export async function recordPersistedActivity(
+  studentId: string,
+  activity: { id: string; kind: string; points: number; date: string; label: string }
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  if (!isUuid(studentId) || !isUuid(activity.id)) throw new Error("Activity has an invalid ID");
+
+  const { error } = await client.rpc("record_student_activity", {
+    p_activity_id: activity.id,
+    p_student_id: studentId,
+    p_kind: activity.kind,
+    p_points: activity.points,
+    p_date: activity.date,
+    p_label: activity.label,
+  });
+  if (error) throw error;
+}
+
+export async function syncPersistedBadges(studentId: string, badgeCodes: string[]): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  const { error } = await client.rpc("sync_student_badges", {
+    p_student_id: studentId,
+    p_badge_codes: badgeCodes,
+  });
+  if (error) throw error;
+}
+
+export async function upsertPersistedQuiz(
+  classId: string,
+  quiz: { id: string; title: string; questions: unknown[]; pointsPerCorrect: number }
+): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  if (!isUuid(quiz.id)) throw new Error("Quiz has an invalid ID");
+
+  const { error } = await client.from("quizzes").upsert(
+    {
+      id: quiz.id,
+      class_id: classId,
+      title: quiz.title,
+      questions: quiz.questions,
+      points_per_correct: quiz.pointsPerCorrect,
+    },
+    { onConflict: "id" }
+  );
+  if (error) throw error;
+}
+
+export async function archivePersistedStudent(studentId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  if (!isUuid(studentId)) throw new Error("Student has an invalid ID");
+
+  const { error } = await client
+    .from("students")
+    .update({ archived_at: new Date().toISOString() })
+    .eq("id", studentId);
+  if (error) throw error;
+}
+
+export async function deletePersistedQuiz(quizId: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  if (!isUuid(quizId)) throw new Error("Quiz has an invalid ID");
+
+  const { error } = await client.from("quizzes").delete().eq("id", quizId);
+  if (error) throw error;
+}
+
+export async function redeemPersistedReward(studentId: string, rewardCode: string): Promise<void> {
+  const client = getSupabaseClient();
+  if (!client) throw new Error("Supabase is not configured");
+  if (!isUuid(studentId)) throw new Error("Student has an invalid ID");
+
+  const { error } = await client.rpc("redeem_student_reward", {
+    p_student_id: studentId,
+    p_reward_code: rewardCode,
+  });
+  if (error) throw error;
 }
 
 export function subscribeToStateChanges(
@@ -216,24 +291,36 @@ export function subscribeToStateChanges(
   if (!client) return undefined;
 
   const channelName = classId ? `faithquest-class-${classId}` : "faithquest-state-changes";
-  const channel = client
-    .channel(channelName)
-    .on(
+  let channel = client.channel(channelName);
+  const subscriptions = classId
+    ? [{ table: "class_sync_events", filter: `class_id=eq.${classId}` }]
+    : [{ table: "faithquest_state", filter: undefined }];
+
+  let reloadTimer: ReturnType<typeof setTimeout> | undefined;
+  for (const subscription of subscriptions) {
+    channel = channel.on(
       "postgres_changes",
       {
         event: "*",
         schema: "public",
-        table: classId ? "students" : "faithquest_state",
+        table: subscription.table,
+        filter: subscription.filter,
       },
       () => {
-        void loadPersistedState(classId).then((data) => {
-          if (data) onChange(data);
-        });
+        if (reloadTimer) clearTimeout(reloadTimer);
+        reloadTimer = setTimeout(() => {
+          void loadPersistedState(classId).then((data) => {
+            if (data) onChange(data);
+          });
+        }, 750);
       }
-    )
-    .subscribe();
+    );
+  }
+
+  channel.subscribe();
 
   return () => {
+    if (reloadTimer) clearTimeout(reloadTimer);
     void client.removeChannel(channel);
   };
 }
