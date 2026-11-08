@@ -34,25 +34,30 @@ export default function AdminChurchesPage() {
   const fetchChurches = useCallback(async () => {
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from("churches")
-      .select("*, teacher_classes(id, user_id)")
-      .order("created_at", { ascending: false });
+    const [churchResult, staffResult, classResult] = await Promise.all([
+      supabase.from("churches").select("*").order("created_at", { ascending: false }),
+      supabase.from("profiles").select("id, church_id").eq("role", "teacher"),
+      supabase.from("teacher_classes").select("id, church_id").is("deleted_at", null),
+    ]);
+    const { data, error } = churchResult;
+    const staff = staffResult.data;
+    const classes = classResult.data;
+    const loadError = error || staffResult.error || classResult.error;
 
-    if (data) {
+    if (data && !loadError) {
       const formatted = data.map((c: any) => {
-        const classes = c.teacher_classes || [];
-        const uniqueTeacherIds = new Set(classes.map((cl: any) => cl.user_id));
         return {
           id: c.id,
           name: c.name,
           admin_id: c.admin_id,
           created_at: c.created_at,
-          class_count: classes.length,
-          teacher_count: uniqueTeacherIds.size,
+          class_count: (classes || []).filter((item: any) => item.church_id === c.id).length,
+          teacher_count: (staff || []).filter((item: any) => item.church_id === c.id).length,
         };
       });
       setChurches(formatted);
+    } else if (loadError) {
+      setToast({ title: `Failed to load churches: ${loadError.message}`, type: "error" });
     }
     setLoading(false);
   }, [supabase]);

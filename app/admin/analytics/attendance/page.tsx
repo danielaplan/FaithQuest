@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/app/lib/supabase/client";
-import { Loader2, CalendarDays, TrendingUp, Users } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Legend
@@ -30,18 +30,23 @@ export default function AdminAttendancePage() {
   const [weeklyData, setWeeklyData] = useState<WeeklyData[]>([]);
   const [totalSunday, setTotalSunday] = useState(0);
   const [totalOutreach, setTotalOutreach] = useState(0);
+  const [uniqueStudents, setUniqueStudents] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
 
     // Get all attendance activities
-    const { data: activities } = await supabase
+    const { data: activities, error: activitiesError } = await supabase
       .from("activities")
-      .select("kind, date, points, students(class_id, teacher_classes(class_name, profiles:user_id(name, email)))")
+      .select("kind, date, student_id, students(class_id, teacher_classes(class_name, profiles:user_id(name, email)))")
       .in("kind", ["attendance", "outreach"])
       .order("date", { ascending: true });
 
-    if (activities) {
+    if (activitiesError) {
+      setError(activitiesError.message);
+    } else if (activities) {
       // Weekly aggregation (last 8 weeks)
       const weekMap: Record<string, { sunday: number; outreach: number }> = {};
       const classMap: Record<string, { class_name: string; teacher_name: string; sunday: number; outreach: number; student_count: number }> = {};
@@ -71,13 +76,19 @@ export default function AdminAttendancePage() {
         }
       });
 
-      // Build weekly chart data (last 8 weeks)
-      const weeks = Object.keys(weekMap).slice(-8);
-      setWeeklyData(weeks.map((w) => ({
-        week: w,
-        "Sunday School": weekMap[w].sunday,
-        "Outreach": weekMap[w].outreach,
-      })));
+      // Always show a comparable eight-week window, including quiet weeks.
+      const weeks = Array.from({ length: 8 }, (_, index) => {
+        const d = new Date();
+        d.setHours(0, 0, 0, 0);
+        d.setDate(d.getDate() - d.getDay() - (7 - index) * 7);
+        const week = d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        return {
+          week,
+          "Sunday School": weekMap[week]?.sunday || 0,
+          Outreach: weekMap[week]?.outreach || 0,
+        };
+      });
+      setWeeklyData(weeks);
 
       // Build class table
       const rows: ClassAttendance[] = Object.values(classMap).map((c) => ({
@@ -95,6 +106,7 @@ export default function AdminAttendancePage() {
       const to = activities.filter((a: any) => a.kind === "outreach").length;
       setTotalSunday(ts);
       setTotalOutreach(to);
+      setUniqueStudents(new Set(activities.map((a: any) => a.student_id)).size);
     }
     setLoading(false);
   }, [supabase]);
@@ -117,6 +129,12 @@ export default function AdminAttendancePage() {
           <Loader2 size={32} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px auto" }} />
           <p style={{ margin: 0, fontWeight: 600 }}>Loading attendance data...</p>
         </div>
+      ) : error ? (
+        <div role="alert" style={{ padding: "50px", textAlign: "center", color: "#991b1b" }}>
+          <AlertCircle size={30} style={{ margin: "0 auto 8px" }} />
+          <p style={{ margin: "0 0 12px", fontWeight: 700 }}>Attendance analytics could not be loaded.</p>
+          <button onClick={fetchData} style={{ border: 0, borderRadius: "10px", padding: "8px 14px", background: "#0f766e", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Try again</button>
+        </div>
       ) : (
         <>
           {/* KPI Summary Cards */}
@@ -124,8 +142,8 @@ export default function AdminAttendancePage() {
             {[
               { label: "Sunday School Check-ins", value: totalSunday, color: "#0f766e", bg: "#ccfbf1" },
               { label: "Outreach Check-ins", value: totalOutreach, color: "#0284c7", bg: "#e0f2fe" },
-              { label: "Total Check-ins", value: totalSunday + totalOutreach, color: "#7c3aed", bg: "#ede9fe" },
-              { label: "Active Classes", value: classData.length, color: "#b45309", bg: "#fef3c7" },
+              { label: "Unique Students", value: uniqueStudents, color: "#7c3aed", bg: "#ede9fe" },
+              { label: "Classes Reporting", value: classData.length, color: "#b45309", bg: "#fef3c7" },
             ].map((kpi) => (
               <div key={kpi.label} style={{
                 background: "#fff", borderRadius: "18px", padding: "18px 20px",
@@ -152,7 +170,7 @@ export default function AdminAttendancePage() {
                 <BarChart data={weeklyData} barGap={4} barCategoryGap="30%">
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                   <XAxis dataKey="week" tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                   <Tooltip contentStyle={{ borderRadius: "12px", border: "1px solid #e2e8f0", boxShadow: "0 4px 12px rgba(0,0,0,0.08)" }} />
                   <Legend iconType="circle" iconSize={8} />
                   <Bar dataKey="Sunday School" fill="#0f766e" radius={[6, 6, 0, 0]} />

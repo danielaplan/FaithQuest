@@ -77,6 +77,7 @@ export default function AdminClassesPage() {
     let query = supabase
       .from("teacher_classes")
       .select("*, profiles:user_id(name, email), students(id), churches(name)", { count: "exact" })
+      .is("deleted_at", null)
       .order("created_at", { ascending: false })
       .range(from, to);
 

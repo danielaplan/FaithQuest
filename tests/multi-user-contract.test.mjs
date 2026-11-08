@@ -93,3 +93,28 @@ test("realtime invalidation is scoped to one class", () => {
   assert.match(persistence, /class_id=eq\.\$\{classId\}/);
   assert.doesNotMatch(persistence, /\["students", "activities", "quizzes"/);
 });
+
+test("admin church assignments are persistent and keep classes aligned", () => {
+  const migration = read("supabase/migrations/09_admin_directory_consistency.sql");
+  const teachers = read("app/admin/teachers/page.tsx");
+
+  assert.match(migration, /ADD COLUMN IF NOT EXISTS church_id UUID/);
+  assert.match(migration, /FUNCTION public\.assign_user_church/);
+  assert.match(migration, /UPDATE public\.teacher_classes[\s\S]*church_id = p_church_id/);
+  assert.match(migration, /INSERT INTO public\.teacher_classes \(user_id, church_id, class_name, join_code\)/);
+  assert.match(teachers, /\.rpc\("assign_user_church"/);
+  assert.doesNotMatch(teachers, /\.from\("teacher_classes"\)[\s\S]{0,120}\.update\(\{ church_id:/);
+});
+
+test("admin student directory uses relational badge awards", () => {
+  const students = read("app/admin/analytics/students/page.tsx");
+  assert.match(students, /student_badges\(id\)/);
+  assert.doesNotMatch(students, /joined_at, badges,/);
+});
+
+test("admin attendance charts keep an eight-week baseline", () => {
+  const attendance = read("app/admin/analytics/attendance/page.tsx");
+  assert.match(attendance, /Array\.from\(\{ length: 8 \}/);
+  assert.match(attendance, /Unique Students/);
+  assert.match(attendance, /allowDecimals=\{false\}/);
+});

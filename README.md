@@ -199,8 +199,9 @@ Apply the SQL migrations in numeric order to an isolated Supabase project before
 6. `06_admin_analytics.sql`
 7. `07_classroom_commands.sql`
 8. `08_class_scoped_realtime.sql`
+9. `09_admin_directory_consistency.sql`
 
-Migrations 04–08 secure role changes and ownership, add relational badge awards, seed stable catalogs, move admin aggregation into PostgreSQL, add idempotent classroom commands, and scope Realtime invalidation to one class. Back up and restore-test any existing project before applying them.
+Migrations 04–09 secure role changes and ownership, add relational badge awards, seed stable catalogs, move admin aggregation into PostgreSQL, add idempotent classroom commands, scope Realtime invalidation to one class, and keep staff/church/class assignments consistent. Back up and restore-test any existing project before applying them.
 
 ## Notes
 

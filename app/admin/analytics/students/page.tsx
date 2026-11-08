@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/app/lib/supabase/client";
-import { Users, Search, Loader2, Church, GraduationCap, Sprout, Leaf, TreePine, Star } from "lucide-react";
+import { Search, Loader2, AlertCircle } from "lucide-react";
 
 interface StudentRow {
   id: string;
@@ -35,22 +35,27 @@ export default function AdminStudentsPage() {
   const [filterChurch, setFilterChurch] = useState("all");
   const [filterLevel, setFilterLevel] = useState("all");
   const [churches, setChurches] = useState<{ id: string; name: string }[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
 
     const { data: churchData } = await supabase.from("churches").select("id, name").order("name");
     if (churchData) setChurches(churchData);
 
-    const { data } = await supabase
+    const { data, error: studentsError } = await supabase
       .from("students")
       .select(`
-        id, name, group_name, joined_at, badges, activities(points),
+        id, name, group_name, joined_at, student_badges(id), activities(points),
         teacher_classes(class_name, churches(name), profiles:user_id(name, email))
       `)
       .order("name");
 
-    if (data) {
+    if (studentsError) {
+      setStudents([]);
+      setError(studentsError.message);
+    } else if (data) {
       const rows: StudentRow[] = data.map((s: any) => {
         const acts = s.activities || [];
         const pts = acts.reduce((sum: number, a: any) => sum + (a.points || 0), 0);
@@ -64,7 +69,7 @@ export default function AdminStudentsPage() {
           teacher_name: cls?.profiles?.name || cls?.profiles?.email?.split("@")[0] || "—",
           church_name: cls?.churches?.name || "—",
           total_points: pts,
-          badge_count: Array.isArray(s.badges) ? s.badges.length : 0,
+          badge_count: Array.isArray(s.student_badges) ? s.student_badges.length : 0,
           faith_level: level.name,
           faith_icon: level.icon,
           joined_at: s.joined_at,
@@ -135,6 +140,12 @@ export default function AdminStudentsPage() {
           <div style={{ padding: "40px", textAlign: "center", color: "#0f766e" }}>
             <Loader2 size={30} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px auto" }} />
             <p style={{ margin: 0, fontWeight: 600 }}>Loading students...</p>
+          </div>
+        ) : error ? (
+          <div role="alert" style={{ padding: "36px", textAlign: "center", color: "#991b1b" }}>
+            <AlertCircle size={28} style={{ margin: "0 auto 8px" }} />
+            <p style={{ margin: "0 0 12px", fontWeight: 700 }}>Students could not be loaded.</p>
+            <button onClick={fetchData} style={{ border: 0, borderRadius: "10px", padding: "8px 14px", background: "#0f766e", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Try again</button>
           </div>
         ) : (
           <div style={{ overflowX: "auto" }}>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/app/lib/supabase/client";
-import { Loader2, Trophy, Sparkles } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, Cell, PieChart, Pie, Legend
@@ -50,13 +50,17 @@ export default function AdminPointsPage() {
   const [leaderboard, setLeaderboard] = useState<LeaderEntry[]>([]);
   const [breakdown, setBreakdown] = useState<ActivityBreakdown[]>([]);
   const [totalPoints, setTotalPoints] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
+    setError(null);
 
     const { data, error } = await supabase.rpc("admin_points_analytics", { p_limit: 100 });
 
-    if (!error && data) {
+    if (error) {
+      setError(error.message);
+    } else if (data) {
       const result = data as unknown as {
         leaderboard: Array<Omit<LeaderEntry, "rank" | "faith_icon">>;
         breakdown: Array<{ kind: string; points: number }>;
@@ -86,6 +90,7 @@ export default function AdminPointsPage() {
   useEffect(() => { fetchData(); }, [fetchData]);
 
   const top10 = leaderboard.slice(0, 10);
+  const averagePoints = leaderboard.length ? Math.round(totalPoints / leaderboard.length) : 0;
 
   return (
     <div style={{ fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
@@ -103,6 +108,12 @@ export default function AdminPointsPage() {
           <Loader2 size={32} style={{ animation: "spin 1s linear infinite", margin: "0 auto 8px auto" }} />
           <p style={{ margin: 0, fontWeight: 600 }}>Loading points data...</p>
         </div>
+      ) : error ? (
+        <div role="alert" style={{ padding: "50px", textAlign: "center", color: "#991b1b" }}>
+          <AlertCircle size={30} style={{ margin: "0 auto 8px" }} />
+          <p style={{ margin: "0 0 12px", fontWeight: 700 }}>Leaderboard analytics could not be loaded.</p>
+          <button onClick={fetchData} style={{ border: 0, borderRadius: "10px", padding: "8px 14px", background: "#0f766e", color: "#fff", fontWeight: 700, cursor: "pointer" }}>Try again</button>
+        </div>
       ) : (
         <>
           {/* KPI */}
@@ -111,7 +122,7 @@ export default function AdminPointsPage() {
               { label: "Total Points Awarded", value: totalPoints.toLocaleString(), color: "#7c3aed", bg: "#ede9fe" },
               { label: "Students Ranked", value: leaderboard.length, color: "#0f766e", bg: "#ccfbf1" },
               { label: "Top Score", value: leaderboard[0]?.total_points.toLocaleString() || "0", color: "#b45309", bg: "#fef3c7" },
-              { label: "Activity Types", value: breakdown.length, color: "#0284c7", bg: "#e0f2fe" },
+              { label: "Average per Student", value: averagePoints.toLocaleString(), color: "#0284c7", bg: "#e0f2fe" },
             ].map((k) => (
               <div key={k.label} style={{ background: "#fff", borderRadius: "16px", padding: "16px 18px", boxShadow: "0 4px 12px rgba(15,118,110,0.07)", border: "1px solid rgba(15,118,110,0.09)" }}>
                 <div style={{ fontSize: "1.8rem", fontFamily: "'Baloo 2', cursive", fontWeight: 800, color: k.color }}>{k.value}</div>
@@ -120,7 +131,7 @@ export default function AdminPointsPage() {
             ))}
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", marginBottom: "24px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 360px), 1fr))", gap: "20px", marginBottom: "24px" }}>
             {/* Top 10 Bar Chart */}
             {top10.length > 0 && (
               <div style={{ background: "#fff", borderRadius: "20px", padding: "22px 24px", boxShadow: "0 4px 12px rgba(15,118,110,0.07)", border: "1px solid rgba(15,118,110,0.09)" }}>
@@ -130,7 +141,7 @@ export default function AdminPointsPage() {
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart data={top10} layout="vertical" barCategoryGap="20%">
                     <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" horizontal={false} />
-                    <XAxis type="number" tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
+                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 10, fill: "#94a3b8" }} axisLine={false} tickLine={false} />
                     <YAxis dataKey="name" type="category" tick={{ fontSize: 11, fill: "#475569" }} axisLine={false} tickLine={false} width={80} />
                     <Tooltip contentStyle={{ borderRadius: "10px", border: "1px solid #e2e8f0" }} formatter={(v) => [`${v} pts`, "Points"]} />
                     <Bar dataKey="total_points" radius={[0, 6, 6, 0]}>
@@ -151,7 +162,7 @@ export default function AdminPointsPage() {
                 </h2>
                 <ResponsiveContainer width="100%" height={260}>
                   <PieChart>
-                    <Pie data={breakdown} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} paddingAngle={3}>
+                    <Pie data={breakdown} dataKey="value" nameKey="name" cx="50%" cy="46%" innerRadius={52} outerRadius={88} paddingAngle={3}>
                       {breakdown.map((entry, i) => (
                         <Cell key={i} fill={entry.color} />
                       ))}

@@ -71,7 +71,7 @@ export default function AdminTeachersPage() {
 
     let query = supabase
       .from("profiles")
-      .select("*, teacher_classes(id, church_id, churches(name))", { count: "exact" })
+      .select("*, church:churches!profiles_church_id_fkey(name), teacher_classes(id, deleted_at)", { count: "exact" })
       .order("created_at", { ascending: false })
       .range(from, to);
 
@@ -86,8 +86,7 @@ export default function AdminTeachersPage() {
       console.error("Error fetching teachers:", error);
     } else if (data) {
       const formatted: TeacherProfile[] = data.map((p: any) => {
-        const classes = p.teacher_classes || [];
-        const firstClassWithChurch = classes.find((c: any) => c.church_id);
+        const classes = (p.teacher_classes || []).filter((c: any) => !c.deleted_at);
         return {
           id: p.id,
           name: p.name || p.email.split("@")[0],
@@ -95,8 +94,8 @@ export default function AdminTeachersPage() {
           role: p.role || "teacher",
           created_at: p.created_at,
           class_count: classes.length,
-          church_id: firstClassWithChurch?.church_id || null,
-          church_name: firstClassWithChurch?.churches?.name || null,
+          church_id: p.church_id || null,
+          church_name: p.church?.name || null,
         };
       });
 
@@ -166,11 +165,10 @@ export default function AdminTeachersPage() {
 
   const handleChurchAssign = async (userId: string, churchId: string) => {
     setUpdatingId(userId);
-    // Assign this teacher's classes to the selected church
-    const { error } = await supabase
-      .from("teacher_classes")
-      .update({ church_id: churchId || null })
-      .eq("user_id", userId);
+    const { error } = await supabase.rpc("assign_user_church", {
+      p_user_id: userId,
+      p_church_id: churchId || null,
+    });
 
     if (error) {
       showToast(`Failed to assign church: ${error.message}`, "error");

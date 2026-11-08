@@ -10,5 +10,10 @@ Store detailed results in the `Test Results` folder and link them here.
 | 2026-11-05 | TypeScript | Local | PASS | `tsc --noEmit` reported no errors |
 | 2026-11-05 | ESLint | Local | PASS WITH WARNINGS | 0 errors; legacy unused-import warnings remain |
 | 2026-11-05 | Production dependency audit | Local | PARTIAL | Critical Next.js advisory removed; one moderate advisory remains |
+| 2026-11-09 | Admin directory consistency contracts | Local | PASS | 12/12 Node tests |
+| 2026-11-09 | TypeScript | Local | PASS | `tsc --noEmit` reported no errors |
+| 2026-11-09 | ESLint | Local | PASS | `eslint .` reported no errors |
+| 2026-11-09 | Next.js production build | Local | PASS | Next.js 16.4.5 compiled and generated 17 routes |
+| 2026-11-09 | Admin UI pattern detector | Local | PASS | No Impeccable detector findings across five changed admin pages |
 
-No production RLS or multi-user acceptance result has been recorded yet.
+Migration 09 staging acceptance and production RLS acceptance have not been recorded yet.
