@@ -118,3 +118,16 @@ test("admin attendance charts keep an eight-week baseline", () => {
   assert.match(attendance, /Unique Students/);
   assert.match(attendance, /allowDecimals=\{false\}/);
 });
+
+test("both portal modes support Google while preserving admin role checks", () => {
+  const signIn = read("app/auth/signin/page.tsx");
+  const callback = read("app/auth/callback/route.ts");
+
+  assert.match(signIn, /Teacher portal/);
+  assert.match(signIn, /Admin portal/);
+  assert.match(signIn, /mode=\$\{loginMode\}/);
+  assert.doesNotMatch(signIn, /Google OAuth — only show for teachers/);
+  assert.match(callback, /requestedMode === "admin"/);
+  assert.match(callback, /error=admin_required&mode=admin/);
+  assert.match(callback, /await supabase\.auth\.signOut\(\)/);
+});

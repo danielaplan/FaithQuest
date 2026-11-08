@@ -4,7 +4,7 @@ import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/app/lib/supabase/client";
-import { Sparkles, Mail, Lock, LogIn, ArrowRight, AlertCircle, Church, Loader2 } from "lucide-react";
+import { Mail, Lock, LogIn, AlertCircle, Church, Loader2 } from "lucide-react";
 
 function SignInContent() {
   const router = useRouter();
@@ -12,11 +12,20 @@ function SignInContent() {
   const next = searchParams.get("next") || "/dashboard";
   const authError = searchParams.get("error");
 
-  const [loginMode, setLoginMode] = useState<"teacher" | "admin">("teacher");
+  const requestedMode = searchParams.get("mode") === "admin" ? "admin" : "teacher";
+  const [loginMode, setLoginMode] = useState<"teacher" | "admin">(requestedMode);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
-  const [errorMsg, setErrorMsg] = useState(authError === "auth_failed" ? "Authentication failed. Please try again." : "");
+  const [errorMsg, setErrorMsg] = useState(
+    authError === "admin_required"
+      ? "This account does not have administrator access. Sign in with an authorized admin account."
+      : authError === "profile_missing"
+        ? "Your account profile is missing. Contact an administrator."
+        : authError === "auth_failed"
+          ? "Authentication failed. Please try again."
+          : ""
+  );
 
   const supabase = createClient();
 
@@ -75,7 +84,7 @@ function SignInContent() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
+        redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}&mode=${loginMode}`,
         queryParams: {
           access_type: "offline",
           prompt: "consent",
@@ -147,10 +156,13 @@ function SignInContent() {
                 fontFamily: "inherit"
               }}
             >
-              {mode === "teacher" ? "👩‍🏫 Teacher" : "🛡️ Admin"}
+              {mode === "teacher" ? "Teacher portal" : "Admin portal"}
             </button>
           ))}
         </div>
+        <p style={{ margin: "-16px 0 26px", textAlign: "center", fontSize: "0.78rem", lineHeight: 1.5, color: isAdmin ? "rgba(255,255,255,0.62)" : "var(--text-muted, #64748b)" }}>
+          Choose a portal. Your account role is verified before access is granted.
+        </p>
 
         {/* Top Header */}
         <div style={{ textAlign: "center", marginBottom: "28px" }}>
@@ -198,9 +210,7 @@ function SignInContent() {
           </div>
         )}
 
-        {/* Google OAuth — only show for teachers */}
-        {!isAdmin && (
-          <>
+        {/* Google OAuth */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
@@ -208,8 +218,9 @@ function SignInContent() {
               style={{
                 width: "100%", display: "flex", alignItems: "center", justifyContent: "center",
                 gap: "12px", padding: "13px 18px", borderRadius: "var(--radius-md, 14px)",
-                background: "#ffffff", border: "1.5px solid var(--card-border, #e2e8f0)",
-                color: "var(--text-main, #0f172a)", fontWeight: 600, fontSize: "0.95rem",
+                background: isAdmin ? "rgba(255,255,255,0.10)" : "#ffffff",
+                border: `1.5px solid ${isAdmin ? "rgba(255,255,255,0.18)" : "var(--card-border, #e2e8f0)"}`,
+                color: isAdmin ? "#ffffff" : "var(--text-main, #0f172a)", fontWeight: 600, fontSize: "0.95rem",
                 cursor: loading ? "not-allowed" : "pointer",
                 boxShadow: "var(--shadow-sm, 0 2px 4px rgba(15,23,42,0.04))",
                 transition: "all 0.2s ease", marginBottom: "22px"
@@ -223,13 +234,11 @@ function SignInContent() {
               </svg>
               Continue with Google
             </button>
-            <div style={{ display: "flex", alignItems: "center", margin: "0 0 22px 0", color: "var(--text-muted,#64748b)", fontSize: "0.82rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-              <div style={{ flex: 1, height: "1px", background: "var(--card-border,#e2e8f0)" }} />
+            <div style={{ display: "flex", alignItems: "center", margin: "0 0 22px 0", color: isAdmin ? "rgba(255,255,255,0.55)" : "var(--text-muted,#64748b)", fontSize: "0.82rem", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+              <div style={{ flex: 1, height: "1px", background: isAdmin ? "rgba(255,255,255,0.16)" : "var(--card-border,#e2e8f0)" }} />
               <span style={{ padding: "0 12px" }}>or sign in with email</span>
-              <div style={{ flex: 1, height: "1px", background: "var(--card-border,#e2e8f0)" }} />
+              <div style={{ flex: 1, height: "1px", background: isAdmin ? "rgba(255,255,255,0.16)" : "var(--card-border,#e2e8f0)" }} />
             </div>
-          </>
-        )}
 
         {/* Email / Password Form */}
         <form onSubmit={handleEmailSignIn} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
